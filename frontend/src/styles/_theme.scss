@@ -1,0 +1,46 @@
+// Angular Material 3 theme mapped onto our design tokens (see _tokens.scss, docs/STYLE_GUIDE.md).
+@use '@angular/material' as mat;
+
+html {
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$yellow-palette,
+        tertiary: mat.$orange-palette,
+      ),
+      typography: Inter,
+      density: 0,
+    )
+  );
+
+  // Pull Material's system colours onto our tokens so Material components match custom ones.
+  @include mat.theme-overrides(
+    (
+      primary: var(--color-primary),
+      on-primary: var(--color-on-primary),
+      primary-container: var(--color-primary-soft),
+      on-primary-container: var(--color-text),
+      surface: var(--color-surface),
+      on-surface: var(--color-text),
+      on-surface-variant: var(--color-text-muted),
+      outline: var(--color-border),
+      outline-variant: var(--color-border),
+      error: var(--color-danger),
+      corner-small: var(--radius-sm),
+      corner-medium: var(--radius-md),
+      corner-large: var(--radius-lg),
+    )
+  );
+
+  @include mat.button-overrides(
+    (
+      filled-container-shape: var(--radius-sm),
+      outlined-container-shape: var(--radius-sm),
+      text-container-shape: var(--radius-sm),
+      // Amber text on white fails contrast. Secondary/tertiary buttons use neutral/amber-dark text.
+      outlined-label-text-color: var(--color-text),
+      outlined-outline-color: var(--color-border),
+      text-label-text-color: var(--color-primary-text),
+    )
+  );
+}

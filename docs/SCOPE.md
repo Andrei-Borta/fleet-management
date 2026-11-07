@@ -1,4 +1,4 @@
-# MVP Scope: Demo milestone (mid-November)
+# MVP Scope: Demo milestone (deadline Thursday, Nov 12)
 
 The assignment: a video of at most 5 minutes showing the features that bring the **most value to the client**.
 User management explicitly does **not** count, so there is **no login** in the MVP.
@@ -39,3 +39,11 @@ Authentication and user management · GPS tracking and transfers between sites �
 `available` → `reserved` (during an approved reservation) · `in_service` (open intervention) ·
 `defective` (open defect, not yet in service) · `retired`.
 Only `available` equipment can be reserved for a period; the backend enforces this.
+
+## Timeline (deadline: Thursday, Nov 12)
+| Day | Goal |
+|---|---|
+| Sun 8 – Mon 9 | Foundations merged: data model (#1), test fixtures and errors (#17), FE shell and theme (#18), API layer (#19), seed skeleton (#13) |
+| Mon 9 – Tue 10 | All `priority:must` features in PRs and merged |
+| Wed 11 | **Code freeze 18:00.** Bug fixing only, full demo dry run, storyboard final |
+| Thu 12 | Record, edit and submit the video |

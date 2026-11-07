@@ -1,10 +1,18 @@
 import { Component } from '@angular/core';
 
+import { PageHeader } from '../../shared/page-header/page-header';
+
 @Component({
   selector: 'app-equipment-page',
+  imports: [PageHeader],
   template: `
-    <h1>Equipment</h1>
-    <p class="placeholder">Not implemented yet. See the GitHub issues labelled mod:equipment.</p>
+    <app-page-header title="Equipment" />
+    <section class="card">
+      <div class="empty-state">
+        <span class="material-symbols-rounded" aria-hidden="true">construction</span>
+        <p>Not implemented yet. See the GitHub issues labelled mod:equipment.</p>
+      </div>
+    </section>
   `,
 })
 export class EquipmentPage {}

@@ -1,24 +1,50 @@
-<header class="topbar">
-  <span class="brand">Fleet Manager</span>
-  <label class="role">
-    Role
-    <select
-      data-testid="role-switcher"
-      [ngModel]="roleService.role()"
-      (ngModelChange)="roleService.role.set($event)"
-    >
-      @for (r of roles; track r.value) {
-        <option [value]="r.value">{{ r.label }}</option>
-      }
-    </select>
-  </label>
-</header>
-<div class="layout">
-  <nav class="sidenav">
+<aside class="sidenav" [class.open]="navOpen()">
+  <div class="brand">
+    <span class="logo material-symbols-rounded" aria-hidden="true">front_loader</span>
+    <span>Fleet Manager</span>
+  </div>
+  <nav>
     @for (item of nav; track item.path) {
-      <a [routerLink]="item.path" routerLinkActive="active">{{ item.label }}</a>
+      <a [routerLink]="item.path" routerLinkActive="active" (click)="navOpen.set(false)">
+        <span class="material-symbols-rounded" aria-hidden="true">{{ item.icon }}</span>
+        {{ item.label }}
+      </a>
     }
   </nav>
+</aside>
+
+<div class="main">
+  <header class="topbar">
+    <button
+      mat-icon-button
+      class="menu"
+      aria-label="Toggle navigation"
+      (click)="navOpen.set(!navOpen())"
+    >
+      <span class="material-symbols-rounded">menu</span>
+    </button>
+    <span class="spacer"></span>
+    <label class="role">
+      <span class="text-caption">Role</span>
+      <select
+        data-testid="role-switcher"
+        [ngModel]="roleService.role()"
+        (ngModelChange)="roleService.role.set($event)"
+      >
+        @for (r of roles; track r.value) {
+          <option [value]="r.value">{{ r.label }}</option>
+        }
+      </select>
+    </label>
+    <button
+      mat-icon-button
+      data-testid="theme-toggle"
+      [attr.aria-label]="dark() ? 'Switch to light theme' : 'Switch to dark theme'"
+      (click)="toggleTheme()"
+    >
+      <span class="material-symbols-rounded">{{ dark() ? 'light_mode' : 'dark_mode' }}</span>
+    </button>
+  </header>
   <main class="content">
     <router-outlet />
   </main>
