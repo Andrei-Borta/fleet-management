@@ -2,6 +2,12 @@ name: Feature / task
 description: A unit of work for the backlog
 labels: []
 body:
+  - type: input
+    id: story
+    attributes:
+      label: User story / parent
+      description: "Part of which [Story] issue? For a new story: As a <role>, I want <goal> so that <benefit>."
+      placeholder: "Part of #45"
   - type: textarea
     id: description
     attributes:
