@@ -25,10 +25,11 @@ See the docs below for the full setup.
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Repository and module layout |
 | [docs/API_CONVENTIONS.md](docs/API_CONVENTIONS.md) | REST conventions shared by BE and FE |
 | [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | Storyline for the 5-minute demo video |
+| [docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md) | UI design system: colours, typography, layout, components |
 | [AGENTS.md](AGENTS.md) | Rules for AI coding agents (also read by humans!) |
 
 Original brief (Romanian): [PROJECT_DETAILS.md](PROJECT_DETAILS.md)
 
 ## Task tracking
-GitHub Issues + the **"Demo – Nov 14"** milestone. Pick an unassigned issue in your lane
+GitHub Issues + the **"Demo – Nov 12"** milestone. Pick an unassigned issue in your lane
 (`backend` / `frontend` / `qa` / `docs`), **assign it to yourself**, and follow [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -9,6 +9,7 @@ commands and layout. Summary of the non-negotiables:
 - Feature branch → PR with `Closes #N` → squash & merge. Never commit to `main`.
 - **Never add `Co-Authored-By: Claude`, "Generated with Claude Code", or any other AI attribution** to
   commits, PRs, issues or code. Claude must never appear as a contributor.
+- Frontend: follow **[docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md)**. Use tokens, `<app-page-header>`, `<app-status-badge>`, and no hard-coded colours.
 - Stay inside the module or feature of the current issue.
 
 Personal, uncommitted preferences go in `CLAUDE.local.md` (gitignored).

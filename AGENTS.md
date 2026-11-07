@@ -9,6 +9,7 @@ Construction fleet & equipment management platform. MVP scope: [docs/SCOPE.md](d
 
 ## Stack
 - Backend: Python 3.12, FastAPI, SQLAlchemy 2 (typed `Mapped[]` style), Alembic, Pydantic v2, PostgreSQL 16, pytest, ruff.
+- UI: [docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md) (tokens + Material 3 amber theme).
 - Frontend: Angular 20 (standalone components, signals, new control flow `@if/@for`), Angular Material, Playwright, angular-eslint.
 
 ## Layout
@@ -51,7 +52,11 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). In short:
    Conventional Commits, PR with `Closes #N`, squash & merge. Never push to `main` directly,
    never force-push shared branches, and never merge your own PR without approval.
 8. Never commit secrets, `.env` files, `node_modules`, build output or test reports.
-9. Don't add new dependencies unless the issue needs them. If you do, pin them and mention them in the PR.
+9. **UI style is binding**: every frontend change follows [docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md).
+   Use the design tokens (`var(--…)` from `frontend/src/styles/_tokens.scss`), the page template with
+   `<app-page-header>`, `<app-status-badge>` for statuses and the shared components. No hard-coded colours,
+   no inline styles, one primary button per view. Run the checklist in §9 of the guide before finishing.
+10. Don't add new dependencies unless the issue needs them. If you do, pin them and mention them in the PR.
 
 ## Style
 - Python: type hints everywhere, ruff-clean, functions in `service.py` take a `Session` as the first arg,
