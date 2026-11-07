@@ -1,0 +1,63 @@
+# --- OS / editors ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+*.swp
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# --- Env & secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Python / backend ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.egg-info/
+*.db
+*.sqlite3
+
+# --- Node / frontend ---
+node_modules/
+dist/
+.angular/
+coverage/
+npm-debug.log*
+yarn-error.log*
+
+# --- Playwright ---
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# --- Docker ---
+pgdata/
+
+# --- AI agents: personal/local files (shared config IS committed) ---
+.claude/settings.local.json
+.claude/worktrees/
+CLAUDE.local.md
+.aider*
+.cursor/
+.codex/
+*.agent.log
+
+# --- Demo video (keep large media out of git) ---
+*.mp4
+*.mov
+*.mkv

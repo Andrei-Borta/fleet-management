@@ -1,0 +1,15 @@
+:host { display: flex; flex-direction: column; min-height: 100vh; }
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 16px; height: 56px; background: #f5a623; color: #1f1f1f;
+}
+.brand { font-weight: 700; font-size: 1.2rem; }
+.role { display: flex; gap: 8px; align-items: center; }
+.layout { display: flex; flex: 1; }
+.sidenav {
+  display: flex; flex-direction: column; width: 200px; padding: 12px 0;
+  background: #2b2b2b;
+  a { color: #ddd; padding: 10px 16px; text-decoration: none; }
+  a.active, a:hover { background: #3c3c3c; color: #fff; }
+}
+.content { flex: 1; padding: 24px; }

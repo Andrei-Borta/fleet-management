@@ -1,0 +1,25 @@
+<header class="topbar">
+  <span class="brand">Fleet Manager</span>
+  <label class="role">
+    Role
+    <select
+      data-testid="role-switcher"
+      [ngModel]="roleService.role()"
+      (ngModelChange)="roleService.role.set($event)"
+    >
+      @for (r of roles; track r.value) {
+        <option [value]="r.value">{{ r.label }}</option>
+      }
+    </select>
+  </label>
+</header>
+<div class="layout">
+  <nav class="sidenav">
+    @for (item of nav; track item.path) {
+      <a [routerLink]="item.path" routerLinkActive="active">{{ item.label }}</a>
+    }
+  </nav>
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>
