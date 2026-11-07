@@ -31,5 +31,5 @@ See the docs below for the full setup.
 Original brief (Romanian): [PROJECT_DETAILS.md](PROJECT_DETAILS.md)
 
 ## Task tracking
-GitHub Issues + the **"Demo – Nov 12"** milestone. Pick an unassigned issue in your lane
+[Sprint board](https://github.com/users/Andrei-Borta/projects/1) · user stories (`story`) with task sub-issues · GitHub Issues + the **"Demo – Nov 12"** milestone. Pick an unassigned issue in your lane
 (`backend` / `frontend` / `qa` / `docs`), **assign it to yourself**, and follow [CONTRIBUTING.md](CONTRIBUTING.md).

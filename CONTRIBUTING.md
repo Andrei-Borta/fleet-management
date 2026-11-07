@@ -1,9 +1,19 @@
 # Contributing: team workflow
 
+## 0. How we work (agile, one-week sprint)
+- **Sprint 1 = Nov 8–12**, goal: a demo of the most valuable features. Board: [Fleet Management – Sprint 1](https://github.com/users/Andrei-Borta/projects/1)
+- **User stories** (`story` label) describe value for a persona: *As a … I want … so that …*. Each story has
+  **task sub-issues** (backend, frontend, QA). A story is done when all its tasks are merged and its acceptance criteria are demoed.
+  **Enablers** (`enabler` label) are technical or process tasks with no story (setup, CI, demo video).
+- **Points** on the board (1/2/3/5/8) are relative effort estimates.
+- **Board flow:** Backlog → Todo → **In progress** (move your card when you start) → **In review** (PR open) → Done (merged).
+- **Daily stand-up** in the team group: what I finished, what's next, what blocks me.
+- **Sprint review** = the demo video. **Retrospective** after Nov 12: what went well, what didn't, what to change.
+
 ## 1. Pick an issue
 - Open the [issues](../../issues) in the **Demo – Nov 12** milestone. Prefer `priority:must`.
 - Pick an unassigned issue in your lane (`backend`, `frontend`, `qa`, `docs`) and **assign it to yourself**
-  before you start. Check its *Depends on* section first.
+  before you start, then move its card to *In progress* on the board. Check its *Depends on* section first.
 - Aim for one or two issues in progress at a time. Comment on the issue if you're blocked.
 
 ## 2. Branch
