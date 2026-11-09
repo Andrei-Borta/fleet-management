@@ -32,6 +32,21 @@ test.describe('notifications', () => {
   });
 });
 
+test('success and error messages have different colour edges', async ({ page }) => {
+  const edge = (selector: string) =>
+    page
+      .locator(`${selector} .mdc-snackbar__surface`)
+      .evaluate((el) => getComputedStyle(el).borderLeftColor);
+
+  await page.getByTestId('notify-success').click();
+  const success = await edge('.snackbar-success');
+  await page.getByTestId('notify-error').click();
+  const error = await edge('.snackbar-error');
+
+  expect(success).not.toBe(error);
+  expect(success).not.toBe('rgba(0, 0, 0, 0)');
+});
+
 test.describe('confirm dialog', () => {
   test('cancel keeps the item', async ({ page }) => {
     await page.getByTestId('delete-sample').click();
