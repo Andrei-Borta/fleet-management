@@ -32,6 +32,15 @@ html {
     )
   );
 
+  // Dialog titles follow the h2 scale (STYLE_GUIDE §4, §6).
+  @include mat.dialog-overrides(
+    (
+      subhead-size: 18px,
+      subhead-weight: 600,
+      subhead-line-height: 1.35,
+    )
+  );
+
   @include mat.button-overrides(
     (
       filled-container-shape: var(--radius-sm),

@@ -144,6 +144,16 @@ a {
   --mat-button-filled-label-text-color: #fff;
 }
 
+// Feedback messages from NotificationService: a coloured edge tells success and error apart.
+.mat-mdc-snack-bar-container {
+  &.snackbar-success .mdc-snackbar__surface {
+    border-left: 4px solid var(--color-success);
+  }
+  &.snackbar-error .mdc-snackbar__surface {
+    border-left: 4px solid var(--color-danger);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;

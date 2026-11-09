@@ -13,6 +13,9 @@
 - Money: `Decimal` serialized as a number with 2 decimals. Currency: RON.
 - Frontend models mirror the response schemas in `features/<x>/<x>.models.ts`. Check them against
   `/docs` (Swagger) when the backend changes.
+- Frontend error handling relies on this error format: the HTTP interceptor shows `detail` (a string,
+  or FastAPI's list of validation errors) for every error except `409`, which the calling page
+  handles. `alternatives` is optional in a `409` body. See `frontend/src/app/core/README.md`.
 - Sites with any reservations cannot be deleted (409), preserving reservation history and site
   cost reporting. Remove a site only when no reservations reference it.
 - A site's dates cannot be changed to exclude an approved reservation (409). A reservation outside

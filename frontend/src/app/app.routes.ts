@@ -1,4 +1,14 @@
+import { isDevMode } from '@angular/core';
 import { Routes } from '@angular/router';
+
+/** Dev-only pages. Not registered in production builds. */
+const devRoutes: Routes = [
+  {
+    path: 'dev/ui-kit',
+    title: 'UI kit',
+    loadComponent: () => import('./dev/ui-kit.page').then((m) => m.UiKitPage),
+  },
+];
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
@@ -40,5 +50,6 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/operations/operations.page').then((m) => m.OperationsPage),
   },
+  ...(isDevMode() ? devRoutes : []),
   { path: '**', redirectTo: 'dashboard' },
 ];

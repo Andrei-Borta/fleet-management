@@ -1,11 +1,11 @@
-<aside class="sidenav" [class.open]="navOpen()">
+<aside id="app-sidenav" class="sidenav" #sidenav [class.open]="navOpen()" data-testid="sidenav">
   <div class="brand">
     <span class="logo material-symbols-rounded" aria-hidden="true">front_loader</span>
     <span>Fleet Manager</span>
   </div>
   <nav>
     @for (item of nav; track item.path) {
-      <a [routerLink]="item.path" routerLinkActive="active" (click)="navOpen.set(false)">
+      <a [routerLink]="item.path" routerLinkActive="active" (click)="closeNav()">
         <span class="material-symbols-rounded" aria-hidden="true">{{ item.icon }}</span>
         {{ item.label }}
       </a>
@@ -13,13 +13,27 @@
   </nav>
 </aside>
 
+@if (navOpen()) {
+  <!-- Pointer-only dismiss target. Keyboard users close the nav with Escape (see App host listener). -->
+  <div
+    class="backdrop"
+    data-testid="nav-backdrop"
+    aria-hidden="true"
+    (click)="closeNav(true)"
+  ></div>
+}
+
 <div class="main">
   <header class="topbar">
     <button
+      #menuButton
       mat-icon-button
       class="menu"
+      data-testid="nav-toggle"
       aria-label="Toggle navigation"
-      (click)="navOpen.set(!navOpen())"
+      aria-controls="app-sidenav"
+      [attr.aria-expanded]="navOpen()"
+      (click)="toggleNav()"
     >
       <span class="material-symbols-rounded">menu</span>
     </button>
@@ -39,10 +53,12 @@
     <button
       mat-icon-button
       data-testid="theme-toggle"
-      [attr.aria-label]="dark() ? 'Switch to light theme' : 'Switch to dark theme'"
-      (click)="toggleTheme()"
+      [attr.aria-label]="theme.isDark() ? 'Switch to light theme' : 'Switch to dark theme'"
+      (click)="theme.toggle()"
     >
-      <span class="material-symbols-rounded">{{ dark() ? 'light_mode' : 'dark_mode' }}</span>
+      <span class="material-symbols-rounded">{{
+        theme.isDark() ? 'light_mode' : 'dark_mode'
+      }}</span>
     </button>
   </header>
   <main class="content">
