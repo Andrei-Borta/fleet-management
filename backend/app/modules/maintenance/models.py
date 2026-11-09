@@ -1,6 +1,6 @@
 """Defects, service interventions, and parts used during an intervention."""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 
@@ -15,10 +15,21 @@ class DefectStatus(StrEnum):
     RESOLVED = "resolved"
 
 
+class DefectSeverity(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    CRITICAL = "critical"
+
+
+class InterventionKind(StrEnum):
+    REPAIR = "repair"
+    REVISION = "revision"
+
+
 class InterventionStatus(StrEnum):
-    OPEN = "open"
+    PLANNED = "planned"
     IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
+    DONE = "done"
 
 
 class Defect(Base):
@@ -27,6 +38,9 @@ class Defect(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     equipment_id: Mapped[int] = mapped_column(ForeignKey("equipment.id"), index=True)
     description: Mapped[str] = mapped_column(Text)
+    severity: Mapped[DefectSeverity] = mapped_column(
+        Enum(DefectSeverity, values_callable=lambda e: [v.value for v in e], name="defect_severity")
+    )
     status: Mapped[DefectStatus] = mapped_column(
         Enum(DefectStatus, values_callable=lambda e: [v.value for v in e], name="defect_status"),
         default=DefectStatus.OPEN,
@@ -41,7 +55,8 @@ class Defect(Base):
 class ServiceIntervention(Base):
     __tablename__ = "service_interventions"
     __table_args__ = (
-        CheckConstraint("labor_cost >= 0", name="ck_service_interventions_labor_cost"),
+        CheckConstraint("labor_hours >= 0", name="ck_service_interventions_labor_hours"),
+        CheckConstraint("labor_rate >= 0", name="ck_service_interventions_labor_rate"),
         CheckConstraint("completed_at >= started_at", name="ck_service_interventions_dates"),
     )
 
@@ -49,18 +64,27 @@ class ServiceIntervention(Base):
     equipment_id: Mapped[int] = mapped_column(ForeignKey("equipment.id"), index=True)
     defect_id: Mapped[int | None] = mapped_column(ForeignKey("defects.id"), index=True)
     description: Mapped[str] = mapped_column(Text)
+    kind: Mapped[InterventionKind] = mapped_column(
+        Enum(
+            InterventionKind,
+            values_callable=lambda e: [v.value for v in e],
+            name="intervention_kind",
+        )
+    )
+    scheduled_date: Mapped[date]
     status: Mapped[InterventionStatus] = mapped_column(
         Enum(
             InterventionStatus,
             values_callable=lambda e: [v.value for v in e],
             name="intervention_status",
         ),
-        default=InterventionStatus.OPEN,
-        server_default=InterventionStatus.OPEN.value,
+        default=InterventionStatus.PLANNED,
+        server_default=InterventionStatus.PLANNED.value,
     )
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    labor_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, server_default="0")
+    labor_hours: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, server_default="0")
+    labor_rate: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, server_default="0")
 
 
 class InterventionPart(Base):
