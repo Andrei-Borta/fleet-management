@@ -38,9 +38,11 @@ frontend/e2e/<feature>.spec.ts   Playwright specs (required)
   service intervals and last-service readings. A site has a budget and date range.
 - Each reservation links one equipment record to one site. Its date range is inclusive and its
   status starts as `pending`. Conflict detection and status transitions belong to the services.
-- Each defect belongs to equipment. Each service intervention belongs to equipment and may link to
-  a defect; planned servicing can therefore be recorded without a defect. Each intervention can
-  have multiple parts, with quantity and unit cost; labour cost is stored on the intervention.
+- Each defect belongs to equipment and has a low, medium or critical severity. Each service
+  intervention belongs to equipment and may link to a defect; it tracks repair/revision kind,
+  scheduled date, planned/in-progress/done status, labour hours and hourly rate. Each intervention
+  can have multiple parts, with quantity and unit cost.
+  The service layer will calculate intervention cost and enforce the maintenance workflows.
 - Foreign keys preserve references; numeric checks prevent negative costs and readings, and date
   checks reject reversed ranges. Timestamps are timezone-aware. Service intervals and completion
   timestamps may be absent until known. All monetary values use fixed decimal precision in RON.
