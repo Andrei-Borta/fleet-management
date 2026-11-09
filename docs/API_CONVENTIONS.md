@@ -38,6 +38,12 @@
 start, end, status}`, ordered by `start`. `type` is `reservation` (pending and approved only) or
   `maintenance` (planned, in progress or done); `id` is the reservation or intervention id. Maintenance
   has no site and `end` is `null` while in progress. Filtering by `site_id` returns reservations only.
+- Defects live under `/maintenance/defects`: `POST` reports one (`equipment_id`, `description`,
+  `severity` of `low`, `medium` or `critical`) and `GET` lists them, with `?equipment_id=` and
+  `?open=true|false` (open or resolved only). Creating a defect, and resolving one by completing its
+  repair, recomputes equipment status in that same transaction. An open critical defect sets the
+  machine to `defective`, unless it is retired or an intervention is in progress (that stays
+  `in_service`). Resolving the last open critical defect frees it again. A missing machine is a `404`.
 - Sites with any reservations cannot be deleted (409), preserving reservation history and site
   cost reporting. Remove a site only when no reservations reference it.
 - A site's dates cannot be changed to exclude an approved reservation (409). A reservation outside

@@ -8,7 +8,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_valid
 from pydantic.json_schema import SkipJsonSchema
 
 from app.modules.equipment.models import EquipmentStatus
-from app.modules.maintenance.models import InterventionKind, InterventionStatus
+from app.modules.maintenance.models import (
+    DefectSeverity,
+    DefectStatus,
+    InterventionKind,
+    InterventionStatus,
+)
 
 
 class DueEquipmentRead(BaseModel):
@@ -26,6 +31,25 @@ class DueEquipmentRead(BaseModel):
 
 
 Amount = Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2, allow_inf_nan=False)]
+Description = Annotated[str, Field(min_length=1, max_length=2000, pattern=r".*\S.*")]
+
+
+class DefectCreate(BaseModel):
+    equipment_id: int
+    description: Description
+    severity: DefectSeverity
+
+
+class DefectRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    equipment_id: int
+    description: str
+    severity: DefectSeverity
+    status: DefectStatus
+    reported_at: datetime
+    resolved_at: datetime | None
 
 
 class InterventionCreate(BaseModel):
