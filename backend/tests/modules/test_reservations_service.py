@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.orm import Session
 
-from app.core.errors import InvalidDataError
+from app.core.errors import InvalidDataError, NotFoundError
 from app.modules.equipment.models import Equipment, EquipmentStatus
 from app.modules.maintenance.models import (
     InterventionKind,
@@ -13,6 +13,8 @@ from app.modules.maintenance.models import (
 )
 from app.modules.reservations.models import Reservation, ReservationStatus
 from app.modules.reservations.service import (
+    ReservationConflictError,
+    ensure_reservable,
     find_conflicts,
     has_approved_outside_site_dates,
     periods_overlap,
@@ -240,3 +242,38 @@ def test_find_conflicts_returns_reservations_and_maintenance_together(db):
 def test_find_conflicts_rejects_inverted_period_even_with_no_bookings(db):
     with pytest.raises(InvalidDataError):
         find_conflicts(db, make_equipment(db).id, D(2026, 11, 5), D(2026, 11, 1))
+
+
+@pytest.mark.parametrize("status", [EquipmentStatus.AVAILABLE, EquipmentStatus.RESERVED])
+def test_ensure_reservable_accepts_free_equipment(db, status):
+    equipment = make_equipment(db, status=status)
+
+    ensure_reservable(db, equipment.id, BOOKED_START, BOOKED_END)
+
+
+@pytest.mark.parametrize(
+    "status",
+    [EquipmentStatus.DEFECTIVE, EquipmentStatus.IN_SERVICE, EquipmentStatus.RETIRED],
+)
+def test_ensure_reservable_rejects_blocked_equipment(db, status):
+    equipment = make_equipment(db, status=status)
+
+    with pytest.raises(ReservationConflictError, match=status.value) as error:
+        ensure_reservable(db, equipment.id, BOOKED_START, BOOKED_END)
+
+    assert error.value.conflicts == []
+
+
+def test_ensure_reservable_reports_the_overlapping_booking(db):
+    equipment = make_equipment(db)
+    reservation = make_reservation(db, equipment)
+
+    with pytest.raises(ReservationConflictError) as error:
+        ensure_reservable(db, equipment.id, BOOKED_START, BOOKED_START)
+
+    assert [c.id for c in error.value.conflicts] == [reservation.id]
+
+
+def test_ensure_reservable_rejects_unknown_equipment(db):
+    with pytest.raises(NotFoundError):
+        ensure_reservable(db, 99999999, BOOKED_START, BOOKED_END)

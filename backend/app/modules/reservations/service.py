@@ -8,10 +8,25 @@ from datetime import date
 from sqlalchemy import exists, or_, select
 from sqlalchemy.orm import Session
 
-from app.core.errors import InvalidDataError
+from app.core.errors import ConflictError, InvalidDataError, NotFoundError
+from app.modules.equipment.models import Equipment, EquipmentStatus
 from app.modules.maintenance.models import InterventionStatus, ServiceIntervention
 from app.modules.reservations.models import Reservation, ReservationStatus
 from app.modules.reservations.schemas import ConflictRead
+
+BLOCKED_STATUSES = (
+    EquipmentStatus.DEFECTIVE,
+    EquipmentStatus.IN_SERVICE,
+    EquipmentStatus.RETIRED,
+)
+
+
+class ReservationConflictError(ConflictError):
+    """The equipment cannot be reserved for the period; carries what stands in the way."""
+
+    def __init__(self, message: str, conflicts: list[ConflictRead]) -> None:
+        super().__init__(message)
+        self.conflicts = conflicts
 
 
 def periods_overlap(start_a: date, end_a: date, start_b: date, end_b: date) -> bool:
@@ -97,3 +112,23 @@ def find_conflicts(db: Session, equipment_id: int, start: date, end: date) -> li
         )
     ]
     return reservation_conflicts + maintenance_conflicts
+
+
+def ensure_reservable(db: Session, equipment_id: int, start: date, end: date) -> None:
+    """Raise unless the equipment can be booked for the period.
+
+    Locks the equipment row until the transaction ends, so two simultaneous requests for
+    the same machine are checked one after the other and cannot both succeed.
+    """
+    equipment = db.get(Equipment, equipment_id, with_for_update=True)
+    if equipment is None:
+        raise NotFoundError("Equipment not found")
+    if equipment.status in BLOCKED_STATUSES:
+        raise ReservationConflictError(
+            f"Equipment is {equipment.status.value} and cannot be reserved", []
+        )
+    conflicts = find_conflicts(db, equipment_id, start, end)
+    if conflicts:
+        raise ReservationConflictError(
+            "Equipment is already booked or in maintenance for this period", conflicts
+        )
