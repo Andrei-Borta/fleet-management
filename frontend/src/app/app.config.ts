@@ -7,6 +7,7 @@ import {
 import { provideRouter } from '@angular/router';
 
 import { routes } from './app.routes';
+import { errorInterceptor } from './core/error.interceptor';
 import { roleInterceptor } from './core/role.interceptor';
 
 export const appConfig: ApplicationConfig = {
@@ -14,6 +15,6 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
-    provideHttpClient(withInterceptors([roleInterceptor])),
+    provideHttpClient(withInterceptors([roleInterceptor, errorInterceptor])),
   ],
 };

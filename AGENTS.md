@@ -62,6 +62,18 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). In short:
    no inline styles, one primary button per view. Run the checklist in §9 of the guide before finishing.
 10. Don't add new dependencies unless the issue needs them. If you do, pin them and mention them in the PR.
 
+## Frontend building blocks (use these, don't build your own)
+Details: [frontend/src/app/core/README.md](frontend/src/app/core/README.md) and STYLE_GUIDE §6. Live demo in dev builds: `/dev/ui-kit`.
+- **HTTP errors are handled globally** by `core/error.interceptor.ts`: every failed request except a 409
+  shows the backend `detail` as an error message. Don't show your own message for it, but do set the page's error state.
+- **409 Conflict is never shown automatically.** Handle it in the calling page with `asConflict()` from
+  `core/api-error.ts`; `alternatives` is optional in the body.
+- **Feedback:** `NotificationService` (`success()` 3s, `error()` until dismissed). Never use `MatSnackBar` directly.
+- **Destructive actions** always go through `ConfirmService.confirm({ …, destructive: true })` from `shared/confirm-dialog/`.
+- **Loading and error state:** signals plus `mat-progress-bar` in the card, as in the pattern in `core/README.md`.
+- **Models:** `features/<x>/<x>.models.ts`, mirroring the backend response schemas (snake_case, ISO dates, money as `number`).
+- **Theme:** use `ThemeService` only; it saves the choice in `localStorage`.
+
 ## Style
 - Python: type hints everywhere, ruff-clean, functions in `service.py` take a `Session` as the first arg,
   raise domain errors (`ValueError` / custom exceptions) that the router maps to HTTP status codes.

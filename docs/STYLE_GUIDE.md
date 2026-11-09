@@ -21,6 +21,8 @@ deep-yellow accent that recalls construction machinery.
 ## 2. Theme modes
 - Light theme is the default. Dark theme is supported through `<html data-theme="dark">`; tokens switch
   automatically. Components must look right in both, which is easy if you only use tokens.
+- The top-bar toggle goes through `ThemeService` (`core/theme.service.ts`), which saves the choice in
+  `localStorage`. Don't set `data-theme` anywhere else.
 
 ## 3. Colour tokens
 
@@ -84,7 +86,8 @@ For status charts use the status colours. Never use the default library palette.
 
 ### 5.1 App shell (exists in `app.html`, do not fork it)
 - **Sidenav** 240px, charcoal, white/70% text. The active item gets an amber 3px left bar, amber icon and white text.
-  Collapses to a top-bar menu button under 960px.
+  Collapses to a top-bar menu button under 960px. There it opens over a `--color-scrim` backdrop and
+  closes on a backdrop click, on Escape or after choosing a page; focus moves into the nav and back to the menu button.
 - **Top bar** 64px, surface colour, bottom border: page context left; role switcher and notifications right.
 - **Content:** `--color-bg`, padding `--space-6`, max width 1280px, centered.
 
@@ -113,9 +116,10 @@ For status charts use the status colours. Never use the default library palette.
 | **KPI tile** | `.kpi`: caption label, `.text-display .num` value, optional delta in success/danger. |
 | **Status** | Only `<app-status-badge [status]="…">`. Never colour statuses by hand. |
 | **Dialogs** | `MatDialog`, max width 560px, title in `h2`, actions bottom right. Confirm dialog for every destructive action. |
-| **Feedback** | `MatSnackBar`: success 3s, error until dismissed. Messages short, in sentence case, no exclamation marks. |
+| **Confirm dialog** | `ConfirmService.confirm({ title, message, confirmLabel, destructive })` from `shared/confirm-dialog/`. Returns `Observable<boolean>`. Title is a question ("Delete site?"), confirm label is the verb ("Delete"), `destructive: true` makes the button red. Cancel gets the initial focus. Never open the dialog component directly. |
+| **Feedback** | `NotificationService` from `core/` (never `MatSnackBar` directly): `success()` closes after 3s, `error()` stays until dismissed. Failed HTTP requests already show an error through the interceptor, so don't add another (see `frontend/src/app/core/README.md`). Messages short, in sentence case, no exclamation marks. |
 | **Empty state** | Centered icon (48px, muted) + one line + primary action when relevant. Never a blank table. |
-| **Loading** | `mat-progress-bar` (indeterminate) at the top of the card, or skeleton rows. No full-page spinners. |
+| **Loading** | `mat-progress-bar` (indeterminate) at the top of the card, or skeleton rows. No full-page spinners. Pattern with signals: `frontend/src/app/core/README.md`. |
 | **Errors** | Inline error card with a retry button inside the affected card; the global interceptor shows a snackbar. |
 | **Dates** | Display `dd MMM yyyy` (e.g. `12 Nov 2026`); date ranges as `12–14 Nov 2026`. Money: `1.250,00 RON`. |
 
@@ -135,6 +139,7 @@ Don't write "Click here". Use the same domain words everywhere: *equipment*, *si
 - [ ] No inline `style="…"`. No new global CSS outside `src/styles/`.
 - [ ] Statuses rendered with `<app-status-badge>`; one primary button per view
 - [ ] Empty, loading and error states implemented
+- [ ] Destructive actions go through `ConfirmService`; feedback goes through `NotificationService`; no extra message for failed HTTP requests
 - [ ] Looks right at 375px and 1440px widths and in dark mode (`document.documentElement.dataset['theme']='dark'`)
-- [ ] Reused `shared/` components. A new reusable component goes in `shared/` (and gets mentioned in this guide)
+- [ ] Reused `shared/` components. A new reusable component goes in `shared/` (and gets mentioned in this guide and shown on the dev-only `/dev/ui-kit` page)
 - [ ] Playwright spec updated
