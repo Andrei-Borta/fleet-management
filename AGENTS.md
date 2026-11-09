@@ -16,6 +16,10 @@ Construction fleet & equipment management platform. MVP scope: [docs/SCOPE.md](d
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). In short:
 - `backend/app/modules/<module>/{models,schemas,service,router}.py`: put logic in `service.py`, keep `router.py` thin.
 - `backend/tests/modules/test_<module>_service.py`: service tests.
+- Backend tests can request the `db` fixture from `backend/tests/conftest.py`; it uses the configured
+  PostgreSQL database and rolls back each test, including calls to `db.commit()`. Run migrations first.
+  See `backend/tests/test_db_fixture.py` for a usage example. Use `NotFoundError`, `ConflictError`,
+  or `ForbiddenError` from `app.core.errors` for domain errors mapped to HTTP 404, 409, and 403.
 - `frontend/src/app/features/<feature>/`: page, components, service, models.
 - `frontend/e2e/<feature>.spec.ts`: Playwright specs.
 
