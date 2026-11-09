@@ -4,6 +4,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.orm import Session
 
+from app.core.deps import Role
 from app.core.errors import InvalidDataError, NotFoundError
 from app.modules.equipment.models import Equipment, EquipmentStatus
 from app.modules.maintenance.models import (
@@ -12,11 +13,14 @@ from app.modules.maintenance.models import (
     ServiceIntervention,
 )
 from app.modules.reservations.models import Reservation, ReservationStatus
+from app.modules.reservations.schemas import ReservationCreate
 from app.modules.reservations.service import (
     ReservationConflictError,
+    create_reservation,
     ensure_reservable,
     find_conflicts,
     has_approved_outside_site_dates,
+    list_reservations,
     periods_overlap,
 )
 from app.modules.sites.models import Site
@@ -277,3 +281,108 @@ def test_ensure_reservable_reports_the_overlapping_booking(db):
 def test_ensure_reservable_rejects_unknown_equipment(db):
     with pytest.raises(NotFoundError):
         ensure_reservable(db, 99999999, BOOKED_START, BOOKED_END)
+
+
+def new_request(
+    equipment_id: int,
+    site_id: int,
+    start: date = BOOKED_START,
+    end: date = BOOKED_END,
+    note: str | None = None,
+) -> ReservationCreate:
+    return ReservationCreate(
+        equipment_id=equipment_id, site_id=site_id, start_date=start, end_date=end, note=note
+    )
+
+
+def test_reservation_create_schema_rejects_end_before_start():
+    with pytest.raises(ValueError):
+        new_request(1, 1, start=BOOKED_END, end=BOOKED_START)
+
+
+def test_create_reservation_stores_a_pending_request(db):
+    data = new_request(make_equipment(db).id, make_site(db).id, note="Foundation works")
+
+    reservation = create_reservation(db, data, Role.SITE_MANAGER)
+
+    assert reservation.id is not None
+    assert reservation.status == ReservationStatus.PENDING
+    assert reservation.requested_by_role == "site_manager"
+    assert reservation.note == "Foundation works"
+    assert (reservation.start_date, reservation.end_date) == (BOOKED_START, BOOKED_END)
+
+
+def test_create_reservation_allows_the_exact_site_period(db):
+    site = make_site(db)
+    data = new_request(make_equipment(db).id, site.id, site.start_date, site.end_date)
+
+    assert create_reservation(db, data, Role.SITE_MANAGER).status == ReservationStatus.PENDING
+
+
+@pytest.mark.parametrize(
+    ("start", "end"),
+    [
+        (D(2026, 10, 31), D(2026, 11, 5)),  # starts the day before the site opens
+        (D(2026, 12, 20), D(2027, 1, 1)),  # ends the day after the site closes
+    ],
+)
+def test_create_reservation_rejects_dates_outside_the_site_period(db, start, end):
+    data = new_request(make_equipment(db).id, make_site(db).id, start, end)
+
+    with pytest.raises(InvalidDataError, match="site dates"):
+        create_reservation(db, data, Role.SITE_MANAGER)
+
+
+def test_create_reservation_rejects_unknown_site(db):
+    with pytest.raises(NotFoundError, match="Site"):
+        create_reservation(db, new_request(make_equipment(db).id, 99999999), Role.SITE_MANAGER)
+
+
+def test_create_reservation_rejects_unknown_equipment(db):
+    with pytest.raises(NotFoundError, match="Equipment"):
+        create_reservation(db, new_request(99999999, make_site(db).id), Role.SITE_MANAGER)
+
+
+def test_create_reservation_rejects_double_booking(db):
+    equipment = make_equipment(db)
+    make_reservation(db, equipment)
+
+    with pytest.raises(ReservationConflictError):
+        create_reservation(db, new_request(equipment.id, make_site(db).id), Role.SITE_MANAGER)
+
+
+def test_create_reservation_allows_overlapping_pending_requests(db):
+    equipment = make_equipment(db)
+    site = make_site(db)
+
+    create_reservation(db, new_request(equipment.id, site.id), Role.SITE_MANAGER)
+    second = create_reservation(db, new_request(equipment.id, site.id), Role.SITE_MANAGER)
+
+    assert second.status == ReservationStatus.PENDING
+
+
+def test_list_reservations_filters_by_site_equipment_and_status(db):
+    first_equipment, second_equipment = make_equipment(db), make_equipment(db)
+    first = make_reservation(db, first_equipment, status=ReservationStatus.PENDING)
+    second = make_reservation(db, second_equipment, status=ReservationStatus.APPROVED)
+
+    assert {first.id, second.id} <= {r.id for r in list_reservations(db)}
+    assert [r.id for r in list_reservations(db, site_id=first.site_id)] == [first.id]
+    assert [r.id for r in list_reservations(db, equipment_id=second_equipment.id)] == [second.id]
+    assert first.id in {r.id for r in list_reservations(db, status=ReservationStatus.PENDING)}
+    assert first.id not in {r.id for r in list_reservations(db, status=ReservationStatus.APPROVED)}
+    combined = list_reservations(
+        db, equipment_id=first_equipment.id, status=ReservationStatus.APPROVED
+    )
+    assert combined == []
+
+
+def test_list_reservations_orders_by_start_date(db):
+    equipment = make_equipment(db)
+    later = make_reservation(db, equipment, start=D(2026, 12, 1), end=D(2026, 12, 2))
+    earlier = make_reservation(db, equipment, start=D(2026, 11, 1), end=D(2026, 11, 2))
+
+    assert [r.id for r in list_reservations(db, equipment_id=equipment.id)] == [
+        earlier.id,
+        later.id,
+    ]

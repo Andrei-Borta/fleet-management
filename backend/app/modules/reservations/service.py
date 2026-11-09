@@ -8,11 +8,13 @@ from datetime import date
 from sqlalchemy import exists, or_, select
 from sqlalchemy.orm import Session
 
+from app.core.deps import Role
 from app.core.errors import ConflictError, InvalidDataError, NotFoundError
 from app.modules.equipment.models import Equipment, EquipmentStatus
 from app.modules.maintenance.models import InterventionStatus, ServiceIntervention
 from app.modules.reservations.models import Reservation, ReservationStatus
-from app.modules.reservations.schemas import ConflictRead
+from app.modules.reservations.schemas import ConflictRead, ReservationCreate
+from app.modules.sites.models import Site
 
 BLOCKED_STATUSES = (
     EquipmentStatus.DEFECTIVE,
@@ -132,3 +134,34 @@ def ensure_reservable(db: Session, equipment_id: int, start: date, end: date) ->
         raise ReservationConflictError(
             "Equipment is already booked or in maintenance for this period", conflicts
         )
+
+
+def list_reservations(
+    db: Session,
+    site_id: int | None = None,
+    equipment_id: int | None = None,
+    status: ReservationStatus | None = None,
+) -> list[Reservation]:
+    query = select(Reservation).order_by(Reservation.start_date, Reservation.id)
+    if site_id is not None:
+        query = query.where(Reservation.site_id == site_id)
+    if equipment_id is not None:
+        query = query.where(Reservation.equipment_id == equipment_id)
+    if status is not None:
+        query = query.where(Reservation.status == status)
+    return list(db.scalars(query).all())
+
+
+def create_reservation(db: Session, data: ReservationCreate, role: Role) -> Reservation:
+    """Create a pending request. Fails if the equipment cannot be booked for the period."""
+    site = db.get(Site, data.site_id)
+    if site is None:
+        raise NotFoundError("Site not found")
+    if data.start_date < site.start_date or data.end_date > site.end_date:
+        raise InvalidDataError("Reservation dates must be within the site dates")
+    ensure_reservable(db, data.equipment_id, data.start_date, data.end_date)
+    reservation = Reservation(**data.model_dump(), requested_by_role=role.value)
+    db.add(reservation)
+    db.commit()
+    db.refresh(reservation)
+    return reservation
