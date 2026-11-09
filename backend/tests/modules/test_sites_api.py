@@ -72,10 +72,9 @@ def test_invalid_patch_and_missing_site(
     sites_client: TestClient, payload: dict[str, object]
 ) -> None:
     site_id = sites_client.post("/api/v1/sites", json=payload).json()["id"]
-    assert (
-        sites_client.patch(f"/api/v1/sites/{site_id}", json={"end_date": "2025-01-01"}).status_code
-        == 422
-    )
+    response = sites_client.patch(f"/api/v1/sites/{site_id}", json={"end_date": "2025-01-01"})
+    assert response.status_code == 422
+    assert response.json() == {"detail": "end_date must not be before start_date"}
     assert sites_client.patch(f"/api/v1/sites/{site_id}", json={"name": None}).status_code == 422
     assert sites_client.patch("/api/v1/sites/99999999", json={"name": "New"}).status_code == 404
     assert sites_client.delete("/api/v1/sites/99999999").status_code == 404
@@ -103,3 +102,27 @@ def test_delete_with_reservation_returns_409(
     assert response.status_code == 409
     assert response.json() == {"detail": "Cannot delete a site with reservations"}
     assert sites_client.get(f"/api/v1/sites/{site_id}").status_code == 200
+
+
+def test_patch_dates_conflicting_with_reservation_returns_409(
+    sites_client: TestClient, db: Session, payload: dict[str, object]
+) -> None:
+    site_id = sites_client.post("/api/v1/sites", json=payload).json()["id"]
+    equipment = Equipment(name="Loader", type="loader", serial_no="api-dates", hourly_cost=10)
+    db.add(equipment)
+    db.flush()
+    db.add(
+        Reservation(
+            equipment_id=equipment.id,
+            site_id=site_id,
+            start_date=date(2026, 5, 10),
+            end_date=date(2026, 5, 20),
+            status=ReservationStatus.APPROVED,
+            requested_by_role="site_manager",
+        )
+    )
+    db.commit()
+    response = sites_client.patch(f"/api/v1/sites/{site_id}", json={"end_date": "2026-05-19"})
+    assert response.status_code == 409
+    assert response.json() == {"detail": "Site dates must include all approved reservations"}
+    assert sites_client.get(f"/api/v1/sites/{site_id}").json()["end_date"] == "2026-12-31"

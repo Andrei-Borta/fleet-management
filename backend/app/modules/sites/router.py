@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, Response, status
 
 from app.core.deps import DbSession
 from app.modules.sites import service
@@ -24,12 +24,7 @@ def get_site(db: DbSession, site_id: int) -> SiteRead:
 
 @router.patch("/{site_id}", response_model=SiteRead)
 def update_site(db: DbSession, site_id: int, data: SiteUpdate) -> SiteRead:
-    try:
-        return SiteRead.model_validate(service.update_site(db, site_id, data))
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        ) from exc
+    return SiteRead.model_validate(service.update_site(db, site_id, data))
 
 
 @router.delete("/{site_id}", status_code=status.HTTP_204_NO_CONTENT)

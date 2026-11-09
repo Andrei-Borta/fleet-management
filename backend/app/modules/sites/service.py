@@ -4,7 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.errors import ConflictError, NotFoundError
+from app.core.errors import ConflictError, InvalidDataError, NotFoundError
+from app.modules.reservations.service import has_approved_outside_site_dates
 from app.modules.sites.models import Site
 from app.modules.sites.schemas import SiteCreate, SiteUpdate
 
@@ -34,7 +35,11 @@ def update_site(db: Session, site_id: int, data: SiteUpdate) -> Site:
     start_date = changes.get("start_date", site.start_date)
     end_date = changes.get("end_date", site.end_date)
     if end_date < start_date:
-        raise ValueError("end_date must not be before start_date")
+        raise InvalidDataError("end_date must not be before start_date")
+    if ("start_date" in changes or "end_date" in changes) and has_approved_outside_site_dates(
+        db, site_id, start_date, end_date
+    ):
+        raise ConflictError("Site dates must include all approved reservations")
     for field, value in changes.items():
         setattr(site, field, value)
     db.commit()

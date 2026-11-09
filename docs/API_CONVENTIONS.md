@@ -12,3 +12,5 @@
   `/docs` (Swagger) when the backend changes.
 - Sites with any reservations cannot be deleted (409), preserving reservation history and site
   cost reporting. Remove a site only when no reservations reference it.
+- A site's dates cannot be changed to exclude an approved reservation (409). Reservation creation
+  and approval must also validate the site dates when those flows are implemented.

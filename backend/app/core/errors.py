@@ -16,6 +16,10 @@ class ForbiddenError(Exception):
     """The current role cannot perform the requested operation."""
 
 
+class InvalidDataError(ValueError):
+    """The requested values are invalid for the current resource."""
+
+
 def register_error_handlers(app: FastAPI) -> None:
     """Translate domain errors at the HTTP boundary."""
 
@@ -30,3 +34,9 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ForbiddenError)
     async def forbidden_handler(_request: Request, exc: ForbiddenError) -> JSONResponse:
         return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"detail": str(exc)})
+
+    @app.exception_handler(InvalidDataError)
+    async def invalid_data_handler(_request: Request, exc: InvalidDataError) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"detail": str(exc)}
+        )

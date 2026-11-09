@@ -70,6 +70,44 @@ def test_update_rejects_invalid_dates_without_mutation(
     assert site.end_date == date(2026, 12, 31)
 
 
+def test_update_rejects_dates_excluding_approved_reservation(
+    db: Session, site_data: SiteCreate
+) -> None:
+    site = service.create_site(db, site_data)
+    equipment = Equipment(name="Loader", type="loader", serial_no="site-date", hourly_cost=10)
+    db.add(equipment)
+    db.flush()
+    db.add(
+        Reservation(
+            equipment_id=equipment.id,
+            site_id=site.id,
+            start_date=date(2026, 5, 10),
+            end_date=date(2026, 5, 20),
+            status=ReservationStatus.APPROVED,
+            requested_by_role="site_manager",
+        )
+    )
+    db.commit()
+    for changes in (
+        SiteUpdate(start_date=date(2026, 5, 11)),
+        SiteUpdate(end_date=date(2026, 5, 19)),
+    ):
+        with pytest.raises(ConflictError, match="approved reservations"):
+            service.update_site(db, site.id, changes)
+        assert site.start_date == date(2026, 1, 1)
+        assert site.end_date == date(2026, 12, 31)
+    updated = service.update_site(
+        db,
+        site.id,
+        SiteUpdate(
+            start_date=date(2026, 5, 10),
+            end_date=date(2026, 5, 20),
+        ),
+    )
+    assert updated.start_date == date(2026, 5, 10)
+    assert updated.end_date == date(2026, 5, 20)
+
+
 def test_delete_unreferenced_site(db: Session, site_data: SiteCreate) -> None:
     site = service.create_site(db, site_data)
     site_id = site.id
