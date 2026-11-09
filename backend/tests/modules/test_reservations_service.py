@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from app.core.deps import Role
-from app.core.errors import InvalidDataError, NotFoundError
+from app.core.errors import ConflictError, InvalidDataError, NotFoundError
 from app.modules.equipment.models import Equipment, EquipmentStatus
 from app.modules.maintenance.models import (
     InterventionKind,
@@ -16,12 +16,15 @@ from app.modules.reservations.models import Reservation, ReservationStatus
 from app.modules.reservations.schemas import ReservationCreate
 from app.modules.reservations.service import (
     ReservationConflictError,
+    approve_reservation,
+    cancel_reservation,
     create_reservation,
     ensure_reservable,
     find_conflicts,
     has_approved_outside_site_dates,
     list_reservations,
     periods_overlap,
+    reject_reservation,
 )
 from app.modules.sites.models import Site
 
@@ -386,3 +389,99 @@ def test_list_reservations_orders_by_start_date(db):
         earlier.id,
         later.id,
     ]
+
+
+def test_approve_reservation_approves_a_pending_request(db):
+    reservation = make_reservation(db, make_equipment(db), status=ReservationStatus.PENDING)
+
+    approved = approve_reservation(db, reservation.id)
+
+    assert approved.status == ReservationStatus.APPROVED
+
+
+def test_approve_reservation_rechecks_conflicts(db):
+    equipment = make_equipment(db)
+    first = make_reservation(db, equipment, status=ReservationStatus.PENDING)
+    second = make_reservation(db, equipment, status=ReservationStatus.PENDING)
+    approve_reservation(db, first.id)
+
+    with pytest.raises(ReservationConflictError) as error:
+        approve_reservation(db, second.id)
+
+    assert [c.id for c in error.value.conflicts] == [first.id]
+    assert second.status == ReservationStatus.PENDING
+
+
+def test_approve_reservation_rejects_equipment_that_broke_after_the_request(db):
+    equipment = make_equipment(db)
+    reservation = make_reservation(db, equipment, status=ReservationStatus.PENDING)
+    equipment.status = EquipmentStatus.DEFECTIVE
+    db.flush()
+
+    with pytest.raises(ReservationConflictError):
+        approve_reservation(db, reservation.id)
+
+
+def test_approve_reservation_rejects_dates_the_site_no_longer_covers(db):
+    reservation = make_reservation(db, make_equipment(db), status=ReservationStatus.PENDING)
+    db.get(Site, reservation.site_id).end_date = D(2026, 11, 15)
+    db.flush()
+
+    with pytest.raises(ConflictError, match="site dates"):
+        approve_reservation(db, reservation.id)
+
+    assert reservation.status == ReservationStatus.PENDING
+
+
+@pytest.mark.parametrize("action", [approve_reservation, reject_reservation])
+@pytest.mark.parametrize(
+    "status",
+    [ReservationStatus.APPROVED, ReservationStatus.REJECTED, ReservationStatus.CANCELLED],
+)
+def test_decisions_need_a_pending_request(db, action, status):
+    reservation = make_reservation(db, make_equipment(db), status=status)
+
+    with pytest.raises(ConflictError):
+        action(db, reservation.id)
+
+    assert reservation.status == status
+
+
+def test_reject_reservation_rejects_a_pending_request(db):
+    reservation = make_reservation(db, make_equipment(db), status=ReservationStatus.PENDING)
+
+    rejected = reject_reservation(db, reservation.id)
+
+    assert rejected.status == ReservationStatus.REJECTED
+
+
+@pytest.mark.parametrize("status", [ReservationStatus.PENDING, ReservationStatus.APPROVED])
+def test_cancel_reservation_cancels_active_requests(db, status):
+    reservation = make_reservation(db, make_equipment(db), status=status)
+
+    cancelled = cancel_reservation(db, reservation.id)
+
+    assert cancelled.status == ReservationStatus.CANCELLED
+
+
+@pytest.mark.parametrize("status", [ReservationStatus.REJECTED, ReservationStatus.CANCELLED])
+def test_cancel_reservation_rejects_finished_requests(db, status):
+    reservation = make_reservation(db, make_equipment(db), status=status)
+
+    with pytest.raises(ConflictError):
+        cancel_reservation(db, reservation.id)
+
+
+def test_cancelling_frees_the_period(db):
+    equipment = make_equipment(db)
+    reservation = make_reservation(db, equipment)
+
+    cancel_reservation(db, reservation.id)
+
+    assert find_conflicts(db, equipment.id, BOOKED_START, BOOKED_END) == []
+
+
+@pytest.mark.parametrize("action", [approve_reservation, reject_reservation, cancel_reservation])
+def test_actions_reject_unknown_reservation(db, action):
+    with pytest.raises(NotFoundError):
+        action(db, 99999999)
