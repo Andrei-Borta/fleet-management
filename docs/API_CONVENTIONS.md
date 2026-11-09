@@ -27,6 +27,12 @@
   reservations. Retiring equipment with an approved reservation ending today or later is a `409`.
   Setting `defective` or `in_service` equipment to `available` is a `409` too; only the maintenance
   logic clears that block. Such equipment can still be edited otherwise, or retired.
+- `GET /reservations/calendar?from=&to=&site_id=&equipment_id=` feeds the central calendar. `from` and
+  `to` are required, inclusive ISO dates, at most 93 days apart (`422` otherwise, also when `to` is
+  before `from`). It returns events `{type, id, equipment: {id, name, type}, site: {id, name} | null,
+  start, end, status}`, ordered by `start`. `type` is `reservation` (pending and approved only) or
+  `maintenance` (planned, in progress or done); `id` is the reservation or intervention id. Maintenance
+  has no site and `end` is `null` while in progress. Filtering by `site_id` returns reservations only.
 - Sites with any reservations cannot be deleted (409), preserving reservation history and site
   cost reporting. Remove a site only when no reservations reference it.
 - A site's dates cannot be changed to exclude an approved reservation (409). A reservation outside

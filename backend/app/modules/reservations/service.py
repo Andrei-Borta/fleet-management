@@ -13,7 +13,13 @@ from app.core.errors import ConflictError, InvalidDataError, NotFoundError
 from app.modules.equipment.models import Equipment, EquipmentStatus
 from app.modules.maintenance.models import InterventionStatus, ServiceIntervention
 from app.modules.reservations.models import Reservation, ReservationStatus
-from app.modules.reservations.schemas import ConflictRead, ReservationCreate
+from app.modules.reservations.schemas import (
+    CalendarEquipmentRead,
+    CalendarEventRead,
+    CalendarSiteRead,
+    ConflictRead,
+    ReservationCreate,
+)
 from app.modules.sites.models import Site
 
 BLOCKED_STATUSES = (
@@ -21,6 +27,10 @@ BLOCKED_STATUSES = (
     EquipmentStatus.IN_SERVICE,
     EquipmentStatus.RETIRED,
 )
+
+MAX_CALENDAR_DAYS = 93
+# Rejected and cancelled requests occupy nothing, so the calendar leaves them out.
+CALENDAR_RESERVATION_STATUSES = (ReservationStatus.PENDING, ReservationStatus.APPROVED)
 
 
 class ReservationConflictError(ConflictError):
@@ -165,6 +175,98 @@ def list_reservations(
     if status is not None:
         query = query.where(Reservation.status == status)
     return list(db.scalars(query).all())
+
+
+def _validate_calendar_range(start: date, end: date) -> None:
+    if end < start:
+        raise InvalidDataError("'to' must not be before 'from'")
+    if (end - start).days + 1 > MAX_CALENDAR_DAYS:
+        raise InvalidDataError(f"The calendar range must not exceed {MAX_CALENDAR_DAYS} days")
+
+
+def _maintenance_period(intervention: ServiceIntervention) -> tuple[date, date | None]:
+    """Planned jobs take their scheduled day, finished ones run until completion."""
+    start = intervention.scheduled_date
+    if intervention.status == InterventionStatus.PLANNED:
+        return start, start
+    if intervention.status == InterventionStatus.IN_PROGRESS or intervention.completed_at is None:
+        return start, None
+    return start, max(start, intervention.completed_at.date())
+
+
+def list_calendar_events(
+    db: Session,
+    start: date,
+    end: date,
+    site_id: int | None = None,
+    equipment_id: int | None = None,
+) -> list[CalendarEventRead]:
+    """Reservations and maintenance that touch the period, ordered by start date.
+
+    Maintenance belongs to the equipment, not to a site, so it is left out when filtering by site.
+    """
+    _validate_calendar_range(start, end)
+
+    reservation_query = (
+        select(Reservation, Equipment, Site)
+        .join(Equipment, Reservation.equipment_id == Equipment.id)
+        .join(Site, Reservation.site_id == Site.id)
+        .where(
+            Reservation.status.in_(CALENDAR_RESERVATION_STATUSES),
+            Reservation.start_date <= end,
+            Reservation.end_date >= start,
+        )
+    )
+    if site_id is not None:
+        reservation_query = reservation_query.where(Reservation.site_id == site_id)
+    if equipment_id is not None:
+        reservation_query = reservation_query.where(Reservation.equipment_id == equipment_id)
+
+    events = [
+        CalendarEventRead(
+            type="reservation",
+            id=reservation.id,
+            equipment=CalendarEquipmentRead(
+                id=equipment.id, name=equipment.name, type=equipment.type
+            ),
+            site=CalendarSiteRead(id=site.id, name=site.name),
+            start=reservation.start_date,
+            end=reservation.end_date,
+            status=reservation.status.value,
+        )
+        for reservation, equipment, site in db.execute(reservation_query).all()
+    ]
+
+    if site_id is None:
+        maintenance_query = (
+            select(ServiceIntervention, Equipment)
+            .join(Equipment, ServiceIntervention.equipment_id == Equipment.id)
+            .where(ServiceIntervention.scheduled_date <= end)
+        )
+        if equipment_id is not None:
+            maintenance_query = maintenance_query.where(
+                ServiceIntervention.equipment_id == equipment_id
+            )
+        for intervention, equipment in db.execute(maintenance_query).all():
+            job_start, job_end = _maintenance_period(intervention)
+            if job_end is not None and job_end < start:
+                continue
+            events.append(
+                CalendarEventRead(
+                    type="maintenance",
+                    id=intervention.id,
+                    equipment=CalendarEquipmentRead(
+                        id=equipment.id, name=equipment.name, type=equipment.type
+                    ),
+                    site=None,
+                    start=job_start,
+                    end=job_end,
+                    status=intervention.status.value,
+                )
+            )
+
+    events.sort(key=lambda event: (event.start, event.equipment.id, event.type, event.id))
+    return events
 
 
 def _outside_site_dates(site: Site, start: date, end: date) -> bool:
