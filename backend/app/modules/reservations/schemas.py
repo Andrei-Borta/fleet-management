@@ -1,10 +1,12 @@
 """Request and response models for reservations."""
 
 from datetime import date
+from decimal import Decimal
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, field_serializer, model_validator
 
+from app.modules.equipment.models import EquipmentStatus
 from app.modules.reservations.models import ReservationStatus
 
 
@@ -43,3 +45,27 @@ class ConflictRead(BaseModel):
     start_date: date
     end_date: date | None  # None: maintenance in progress, no known end yet
     status: str
+
+
+class AlternativeRead(BaseModel):
+    """Equipment suggested in place of one that is not free."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    type: str
+    status: EquipmentStatus
+    hourly_cost: Decimal
+
+    @field_serializer("hourly_cost", when_used="json")
+    def serialize_hourly_cost(self, value: Decimal) -> float:
+        return float(value)
+
+
+class ReservationConflictBody(BaseModel):
+    """Body of the 409 returned when equipment cannot be reserved."""
+
+    detail: str
+    conflicts: list[ConflictRead]
+    alternatives: list[AlternativeRead] = []
