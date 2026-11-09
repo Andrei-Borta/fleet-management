@@ -8,11 +8,13 @@ from datetime import date
 from sqlalchemy import exists, or_, select
 from sqlalchemy.orm import Session
 
+from app.core.deps import Role
 from app.core.errors import ConflictError, InvalidDataError, NotFoundError
 from app.modules.equipment.models import Equipment, EquipmentStatus
 from app.modules.maintenance.models import InterventionStatus, ServiceIntervention
 from app.modules.reservations.models import Reservation, ReservationStatus
-from app.modules.reservations.schemas import ConflictRead
+from app.modules.reservations.schemas import ConflictRead, ReservationCreate
+from app.modules.sites.models import Site
 
 BLOCKED_STATUSES = (
     EquipmentStatus.DEFECTIVE,
@@ -132,3 +134,83 @@ def ensure_reservable(db: Session, equipment_id: int, start: date, end: date) ->
         raise ReservationConflictError(
             "Equipment is already booked or in maintenance for this period", conflicts
         )
+
+
+def list_reservations(
+    db: Session,
+    site_id: int | None = None,
+    equipment_id: int | None = None,
+    status: ReservationStatus | None = None,
+) -> list[Reservation]:
+    query = select(Reservation).order_by(Reservation.start_date, Reservation.id)
+    if site_id is not None:
+        query = query.where(Reservation.site_id == site_id)
+    if equipment_id is not None:
+        query = query.where(Reservation.equipment_id == equipment_id)
+    if status is not None:
+        query = query.where(Reservation.status == status)
+    return list(db.scalars(query).all())
+
+
+def _outside_site_dates(site: Site, start: date, end: date) -> bool:
+    return start < site.start_date or end > site.end_date
+
+
+def create_reservation(db: Session, data: ReservationCreate, role: Role) -> Reservation:
+    """Create a pending request. Fails if the equipment cannot be booked for the period."""
+    site = db.get(Site, data.site_id)
+    if site is None:
+        raise NotFoundError("Site not found")
+    if _outside_site_dates(site, data.start_date, data.end_date):
+        raise InvalidDataError("Reservation dates must be within the site dates")
+    ensure_reservable(db, data.equipment_id, data.start_date, data.end_date)
+    reservation = Reservation(**data.model_dump(), requested_by_role=role.value)
+    db.add(reservation)
+    db.commit()
+    db.refresh(reservation)
+    return reservation
+
+
+def _lock_reservation(db: Session, reservation_id: int) -> Reservation:
+    reservation = db.get(Reservation, reservation_id, with_for_update=True)
+    if reservation is None:
+        raise NotFoundError("Reservation not found")
+    return reservation
+
+
+def _require_pending(reservation: Reservation, action: str) -> None:
+    if reservation.status != ReservationStatus.PENDING:
+        raise ConflictError(f"Only pending reservations can be {action}")
+
+
+def _set_status(db: Session, reservation: Reservation, status: ReservationStatus) -> Reservation:
+    reservation.status = status
+    db.commit()
+    db.refresh(reservation)
+    return reservation
+
+
+def approve_reservation(db: Session, reservation_id: int) -> Reservation:
+    """Approve a pending request, re-checking conflicts as the fleet may have changed."""
+    reservation = _lock_reservation(db, reservation_id)
+    _require_pending(reservation, "approved")
+    # Locked so that the site's dates cannot change while this approval is being decided.
+    site = db.get(Site, reservation.site_id, with_for_update=True)
+    if _outside_site_dates(site, reservation.start_date, reservation.end_date):
+        raise ConflictError("Reservation dates are no longer within the site dates")
+    ensure_reservable(db, reservation.equipment_id, reservation.start_date, reservation.end_date)
+    return _set_status(db, reservation, ReservationStatus.APPROVED)
+
+
+def reject_reservation(db: Session, reservation_id: int) -> Reservation:
+    reservation = _lock_reservation(db, reservation_id)
+    _require_pending(reservation, "rejected")
+    return _set_status(db, reservation, ReservationStatus.REJECTED)
+
+
+def cancel_reservation(db: Session, reservation_id: int) -> Reservation:
+    """Cancel a request that is still pending or already approved."""
+    reservation = _lock_reservation(db, reservation_id)
+    if reservation.status not in (ReservationStatus.PENDING, ReservationStatus.APPROVED):
+        raise ConflictError("Only pending or approved reservations can be cancelled")
+    return _set_status(db, reservation, ReservationStatus.CANCELLED)

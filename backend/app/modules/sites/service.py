@@ -14,8 +14,8 @@ def list_sites(db: Session) -> list[Site]:
     return list(db.scalars(select(Site).order_by(Site.id)).all())
 
 
-def get_site(db: Session, site_id: int) -> Site:
-    site = db.get(Site, site_id)
+def get_site(db: Session, site_id: int, *, for_update: bool = False) -> Site:
+    site = db.get(Site, site_id, with_for_update=for_update)
     if site is None:
         raise NotFoundError("Site not found")
     return site
@@ -30,7 +30,8 @@ def create_site(db: Session, data: SiteCreate) -> Site:
 
 
 def update_site(db: Session, site_id: int, data: SiteUpdate) -> Site:
-    site = get_site(db, site_id)
+    # Locked so that a reservation cannot be approved against the dates being replaced.
+    site = get_site(db, site_id, for_update=True)
     changes = data.model_dump(exclude_unset=True)
     start_date = changes.get("start_date", site.start_date)
     end_date = changes.get("end_date", site.end_date)
