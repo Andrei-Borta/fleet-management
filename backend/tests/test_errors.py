@@ -4,13 +4,19 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.core.errors import ConflictError, ForbiddenError, NotFoundError, register_error_handlers
+from app.core.errors import (
+    ConflictError,
+    ForbiddenError,
+    InvalidDataError,
+    NotFoundError,
+    register_error_handlers,
+)
 from app.main import app
 
 
 @pytest.mark.parametrize(
     ("error_type", "expected_status"),
-    [(NotFoundError, 404), (ConflictError, 409), (ForbiddenError, 403)],
+    [(NotFoundError, 404), (ConflictError, 409), (ForbiddenError, 403), (InvalidDataError, 422)],
 )
 def test_domain_errors_map_to_http(error_type, expected_status):
     test_app = FastAPI()
