@@ -120,6 +120,10 @@ nav {
   display: none;
 }
 
+.backdrop {
+  display: none;
+}
+
 .role {
   display: flex;
   align-items: center;
@@ -149,10 +153,25 @@ nav {
     left: 0;
     transform: translateX(-100%);
     box-shadow: var(--shadow-2);
+    // Hidden (and out of the tab order) once the slide-out finishes.
+    visibility: hidden;
+    transition:
+      transform var(--transition),
+      visibility 0s linear 180ms;
 
     &.open {
       transform: none;
+      visibility: visible;
+      transition: transform var(--transition);
     }
+  }
+
+  .backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 9;
+    background: var(--color-scrim);
   }
 
   .menu {
