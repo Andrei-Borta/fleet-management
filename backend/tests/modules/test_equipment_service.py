@@ -1,6 +1,6 @@
 """Service coverage for equipment CRUD, filters and validation."""
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -80,7 +80,7 @@ def test_create_with_all_fields(db: Session) -> None:
         db,
         make(
             "svc-002",
-            status=EquipmentStatus.IN_SERVICE,
+            status=EquipmentStatus.RETIRED,
             engine_hours=Decimal("120.5"),
             service_interval_days=180,
             service_interval_hours=Decimal("250"),
@@ -88,7 +88,7 @@ def test_create_with_all_fields(db: Session) -> None:
             last_service_hours=Decimal("100"),
         ),
     )
-    assert equipment.status == EquipmentStatus.IN_SERVICE
+    assert equipment.status == EquipmentStatus.RETIRED
     assert equipment.engine_hours == Decimal("120.50")
     assert equipment.service_interval_days == 180
     assert equipment.service_interval_hours == Decimal("250")
@@ -137,13 +137,11 @@ def test_update_is_partial(db: Session) -> None:
     updated = service.update_equipment(
         db,
         equipment.id,
-        EquipmentUpdate(
-            name="Loader", engine_hours=Decimal("10"), status=EquipmentStatus.DEFECTIVE
-        ),
+        EquipmentUpdate(name="Loader", engine_hours=Decimal("10"), status=EquipmentStatus.RETIRED),
     )
     assert updated.name == "Loader"
     assert updated.engine_hours == Decimal("10")
-    assert updated.status == EquipmentStatus.DEFECTIVE
+    assert updated.status == EquipmentStatus.RETIRED
     assert updated.serial_no == "svc-upd"
     assert updated.service_interval_days == 90
     assert service.update_equipment(db, equipment.id, EquipmentUpdate()).id == equipment.id
@@ -186,6 +184,112 @@ def test_update_schema_rejects_invalid_values(changes: dict[str, object]) -> Non
         EquipmentUpdate(**changes)
 
 
+@pytest.mark.parametrize(
+    "status", [EquipmentStatus.DEFECTIVE, EquipmentStatus.IN_SERVICE, EquipmentStatus.RESERVED]
+)
+def test_schemas_reject_statuses_set_by_other_logic(status: EquipmentStatus) -> None:
+    with pytest.raises(ValidationError):
+        make("svc-status", status=status)
+    with pytest.raises(ValidationError):
+        EquipmentUpdate(status=status)
+
+
+def test_status_can_move_between_available_and_retired(db: Session) -> None:
+    equipment = service.create_equipment(db, make("svc-flip", status=EquipmentStatus.RETIRED))
+    assert equipment.status == EquipmentStatus.RETIRED
+    back = service.update_equipment(
+        db, equipment.id, EquipmentUpdate(status=EquipmentStatus.AVAILABLE)
+    )
+    assert back.status == EquipmentStatus.AVAILABLE
+    gone = service.update_equipment(
+        db, equipment.id, EquipmentUpdate(status=EquipmentStatus.RETIRED)
+    )
+    assert gone.status == EquipmentStatus.RETIRED
+
+
+@pytest.mark.parametrize("days_until_end", [0, 7])
+def test_retire_is_rejected_with_approved_reservation_ending_today_or_later(
+    db: Session, days_until_end: int
+) -> None:
+    equipment = service.create_equipment(db, make("svc-ret-busy"))
+    today = date.today()
+    reserve(
+        db,
+        equipment.id,
+        today - timedelta(days=2),
+        today + timedelta(days=days_until_end),
+        ReservationStatus.APPROVED,
+    )
+    with pytest.raises(ConflictError, match="Cannot retire equipment"):
+        service.update_equipment(db, equipment.id, EquipmentUpdate(status=EquipmentStatus.RETIRED))
+    assert service.get_equipment(db, equipment.id).status == EquipmentStatus.AVAILABLE
+
+
+def test_retire_is_allowed_when_no_approved_reservation_is_left(db: Session) -> None:
+    equipment = service.create_equipment(db, make("svc-ret-free"))
+    other = service.create_equipment(db, make("svc-ret-other"))
+    today = date.today()
+    future = (today + timedelta(days=3), today + timedelta(days=5))
+    reserve(
+        db,
+        equipment.id,
+        today - timedelta(days=9),
+        today - timedelta(days=1),
+        ReservationStatus.APPROVED,
+    )
+    for status in (
+        ReservationStatus.PENDING,
+        ReservationStatus.REJECTED,
+        ReservationStatus.CANCELLED,
+    ):
+        reserve(db, equipment.id, *future, status)
+    reserve(db, other.id, *future, ReservationStatus.APPROVED)
+
+    retired = service.update_equipment(
+        db, equipment.id, EquipmentUpdate(status=EquipmentStatus.RETIRED)
+    )
+
+    assert retired.status == EquipmentStatus.RETIRED
+    assert service.get_equipment(db, other.id).status == EquipmentStatus.AVAILABLE
+
+
+def test_retiring_retired_equipment_again_is_not_blocked(db: Session) -> None:
+    equipment = service.create_equipment(db, make("svc-ret-again", status=EquipmentStatus.RETIRED))
+    today = date.today()
+    reserve(db, equipment.id, today, today + timedelta(days=2), ReservationStatus.APPROVED)
+    again = service.update_equipment(
+        db, equipment.id, EquipmentUpdate(status=EquipmentStatus.RETIRED, name="Renamed")
+    )
+    assert again.name == "Renamed"
+    assert again.status == EquipmentStatus.RETIRED
+
+
+@pytest.mark.parametrize("status", [EquipmentStatus.DEFECTIVE, EquipmentStatus.IN_SERVICE])
+def test_maintenance_blocked_equipment_cannot_be_made_available_by_hand(
+    db: Session, status: EquipmentStatus
+) -> None:
+    equipment = service.create_equipment(db, make(f"svc-block-{status.value}"))
+    equipment.status = status  # set by the maintenance logic in the real flow
+    db.commit()
+
+    with pytest.raises(ConflictError, match=f"Equipment is {status.value}"):
+        service.update_equipment(
+            db, equipment.id, EquipmentUpdate(status=EquipmentStatus.AVAILABLE, name="Renamed")
+        )
+    unchanged = service.get_equipment(db, equipment.id)
+    assert unchanged.status == status
+    assert unchanged.name == "Excavator"
+
+    # Other fields stay editable, and a broken machine can still be retired.
+    assert (
+        service.update_equipment(db, equipment.id, EquipmentUpdate(name="Renamed")).status == status
+    )
+    retired = service.update_equipment(
+        db, equipment.id, EquipmentUpdate(status=EquipmentStatus.RETIRED)
+    )
+    assert retired.status == EquipmentStatus.RETIRED
+
+
 def test_delete_unreferenced_equipment(db: Session) -> None:
     equipment = service.create_equipment(db, make("svc-del"))
     equipment_id = equipment.id
@@ -214,7 +318,10 @@ def test_delete_equipment_with_defect_is_rejected(db: Session) -> None:
 
 def test_list_filters_by_type_and_status(db: Session) -> None:
     a = service.create_equipment(db, make("svc-l1"))
-    b = service.create_equipment(db, make("svc-l2", status=EquipmentStatus.DEFECTIVE))
+    b = service.create_equipment(db, make("svc-l2"))
+    # `defective` is set by the maintenance logic, never through the API, so force it here.
+    b.status = EquipmentStatus.DEFECTIVE
+    db.commit()
     other = service.create_equipment(db, make("svc-l3", type="svc-test-crane"))
 
     by_type = [item.id for item in service.list_equipment(db, equipment_type=TYPE)]

@@ -57,6 +57,21 @@ def has_approved_outside_site_dates(
     )
 
 
+def has_upcoming_approved_reservation(db: Session, equipment_id: int, today: date) -> bool:
+    """Return whether an approved reservation of the equipment ends today or later."""
+    return bool(
+        db.scalar(
+            select(
+                exists().where(
+                    Reservation.equipment_id == equipment_id,
+                    Reservation.status == ReservationStatus.APPROVED,
+                    Reservation.end_date >= today,
+                )
+            )
+        )
+    )
+
+
 def _validate_period(start: date, end: date) -> None:
     if start > end:
         raise InvalidDataError("start date must not be after end date")

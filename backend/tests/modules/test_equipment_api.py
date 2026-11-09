@@ -1,6 +1,7 @@
 """HTTP contract for equipment CRUD."""
 
 from collections.abc import Iterator
+from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.main import app
+from app.modules.equipment.models import Equipment, EquipmentStatus
 
 URL = "/api/v1/equipment"
 
@@ -50,10 +52,10 @@ def test_equipment_crud_http(equipment_client: TestClient, payload: dict[str, ob
     assert equipment in equipment_client.get(URL).json()
 
     response = equipment_client.patch(
-        f"{URL}/{equipment_id}", json={"status": "defective", "engine_hours": 130}
+        f"{URL}/{equipment_id}", json={"status": "retired", "engine_hours": 130}
     )
     assert response.status_code == 200
-    assert response.json()["status"] == "defective"
+    assert response.json()["status"] == "retired"
     assert response.json()["engine_hours"] == 130
     assert response.json()["name"] == "Excavator"
 
@@ -66,7 +68,7 @@ def test_equipment_crud_http(equipment_client: TestClient, payload: dict[str, ob
 def test_list_filters_http(equipment_client: TestClient, payload: dict[str, object]) -> None:
     first = equipment_client.post(URL, json=payload).json()
     second = equipment_client.post(
-        URL, json={**payload, "serial_no": "api-eq-002", "status": "defective"}
+        URL, json={**payload, "serial_no": "api-eq-002", "status": "retired"}
     ).json()
     equipment_client.post(
         URL, json={**payload, "serial_no": "api-eq-003", "type": "api-test-crane"}
@@ -75,7 +77,7 @@ def test_list_filters_http(equipment_client: TestClient, payload: dict[str, obje
     by_type = equipment_client.get(URL, params={"type": "api-test-excavator"}).json()
     assert [item["id"] for item in by_type] == [first["id"], second["id"]]
     by_status = equipment_client.get(
-        URL, params={"type": "api-test-excavator", "status": "defective"}
+        URL, params={"type": "api-test-excavator", "status": "retired"}
     ).json()
     assert [item["id"] for item in by_status] == [second["id"]]
 
@@ -129,6 +131,79 @@ def test_invalid_create_returns_422(
     equipment_client: TestClient, payload: dict[str, object], changes: dict[str, object]
 ) -> None:
     assert equipment_client.post(URL, json={**payload, **changes}).status_code == 422
+
+
+@pytest.mark.parametrize("status", ["defective", "in_service", "reserved"])
+def test_statuses_set_by_other_logic_return_422(
+    equipment_client: TestClient, payload: dict[str, object], status: str
+) -> None:
+    assert equipment_client.post(URL, json={**payload, "status": status}).status_code == 422
+
+    equipment_id = equipment_client.post(URL, json=payload).json()["id"]
+    response = equipment_client.patch(f"{URL}/{equipment_id}", json={"status": status})
+    assert response.status_code == 422
+    assert equipment_client.get(f"{URL}/{equipment_id}").json()["status"] == "available"
+
+
+def test_retire_with_approved_reservation_returns_409(
+    equipment_client: TestClient, payload: dict[str, object]
+) -> None:
+    equipment_id = equipment_client.post(URL, json=payload).json()["id"]
+    today = date.today()
+    site = {
+        "name": "Site",
+        "address": "Main Street",
+        "budget": 1000,
+        "start_date": (today - timedelta(days=30)).isoformat(),
+        "end_date": (today + timedelta(days=365)).isoformat(),
+    }
+    site_id = equipment_client.post("/api/v1/sites", json=site).json()["id"]
+    reservation = equipment_client.post(
+        "/api/v1/reservations",
+        json={
+            "equipment_id": equipment_id,
+            "site_id": site_id,
+            "start_date": today.isoformat(),
+            "end_date": (today + timedelta(days=3)).isoformat(),
+        },
+    ).json()
+
+    approve = equipment_client.post(f"/api/v1/reservations/{reservation['id']}/approve")
+    assert approve.status_code == 200
+
+    response = equipment_client.patch(f"{URL}/{equipment_id}", json={"status": "retired"})
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Cannot retire equipment with approved reservations until they end"
+    }
+    assert equipment_client.get(f"{URL}/{equipment_id}").json()["status"] == "available"
+
+    # Other fields can still be edited meanwhile.
+    assert (
+        equipment_client.patch(f"{URL}/{equipment_id}", json={"name": "Renamed"}).status_code == 200
+    )
+
+    equipment_client.post(f"/api/v1/reservations/{reservation['id']}/cancel")
+    retired = equipment_client.patch(f"{URL}/{equipment_id}", json={"status": "retired"})
+    assert retired.status_code == 200
+    assert retired.json()["status"] == "retired"
+
+
+def test_defective_equipment_made_available_by_hand_returns_409(
+    equipment_client: TestClient, db: Session, payload: dict[str, object]
+) -> None:
+    equipment_id = equipment_client.post(URL, json=payload).json()["id"]
+    equipment = db.get(Equipment, equipment_id)
+    equipment.status = EquipmentStatus.DEFECTIVE
+    db.commit()
+
+    response = equipment_client.patch(f"{URL}/{equipment_id}", json={"status": "available"})
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Equipment is defective and becomes available through maintenance"
+    }
+    assert equipment_client.get(f"{URL}/{equipment_id}").json()["status"] == "defective"
 
 
 def test_create_without_required_field_returns_422(

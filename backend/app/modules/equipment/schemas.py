@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import (
     BaseModel,
@@ -21,6 +21,9 @@ SerialNo = Annotated[str, Field(min_length=1, max_length=100, pattern=r".*\S.*")
 NonNegative = Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2, allow_inf_nan=False)]
 Positive = Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=2, allow_inf_nan=False)]
 PositiveDays = Annotated[int, Field(gt=0)]
+# The API only sets these. `defective` and `in_service` come from the maintenance logic, and
+# `reserved` is derived from approved reservations instead of being stored by hand.
+WritableStatus = Literal[EquipmentStatus.AVAILABLE, EquipmentStatus.RETIRED]
 
 # Fields that are required in the database: PATCH may omit them but not set them to null.
 REQUIRED_FIELDS = ("name", "type", "serial_no", "status", "engine_hours", "hourly_cost")
@@ -30,7 +33,7 @@ class EquipmentCreate(BaseModel):
     name: Name
     type: EquipmentType
     serial_no: SerialNo
-    status: EquipmentStatus = EquipmentStatus.AVAILABLE
+    status: WritableStatus = EquipmentStatus.AVAILABLE
     engine_hours: NonNegative = Decimal(0)
     hourly_cost: NonNegative
     service_interval_days: PositiveDays | None = None
@@ -43,7 +46,7 @@ class EquipmentUpdate(BaseModel):
     name: Name | SkipJsonSchema[None] = None
     type: EquipmentType | SkipJsonSchema[None] = None
     serial_no: SerialNo | SkipJsonSchema[None] = None
-    status: EquipmentStatus | SkipJsonSchema[None] = None
+    status: WritableStatus | SkipJsonSchema[None] = None
     engine_hours: NonNegative | SkipJsonSchema[None] = None
     hourly_cost: NonNegative | SkipJsonSchema[None] = None
     service_interval_days: PositiveDays | None = None

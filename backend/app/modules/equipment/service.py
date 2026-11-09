@@ -12,7 +12,14 @@ from sqlalchemy.orm import Session
 from app.core.errors import ConflictError, InvalidDataError, NotFoundError
 from app.modules.equipment.models import Equipment, EquipmentStatus
 from app.modules.equipment.schemas import EquipmentCreate, EquipmentUpdate
-from app.modules.reservations.service import BLOCKED_STATUSES, find_conflicts
+from app.modules.reservations.service import (
+    BLOCKED_STATUSES,
+    find_conflicts,
+    has_upcoming_approved_reservation,
+)
+
+# Set by the maintenance logic; only that logic may make such equipment available again.
+MAINTENANCE_STATUSES = (EquipmentStatus.DEFECTIVE, EquipmentStatus.IN_SERVICE)
 
 UNIQUE_VIOLATION = "23505"
 FOREIGN_KEY_VIOLATION = "23503"
@@ -77,7 +84,21 @@ def create_equipment(db: Session, data: EquipmentCreate) -> Equipment:
 def update_equipment(db: Session, equipment_id: int, data: EquipmentUpdate) -> Equipment:
     # Locked so that a reservation cannot be checked against the status being replaced.
     equipment = get_equipment(db, equipment_id, for_update=True)
-    for field, value in data.model_dump(exclude_unset=True).items():
+    changes = data.model_dump(exclude_unset=True)
+    if (
+        changes.get("status") == EquipmentStatus.AVAILABLE
+        and equipment.status in MAINTENANCE_STATUSES
+    ):
+        raise ConflictError(
+            f"Equipment is {equipment.status.value} and becomes available through maintenance"
+        )
+    if (
+        changes.get("status") == EquipmentStatus.RETIRED
+        and equipment.status != EquipmentStatus.RETIRED
+        and has_upcoming_approved_reservation(db, equipment_id, date.today())
+    ):
+        raise ConflictError("Cannot retire equipment with approved reservations until they end")
+    for field, value in changes.items():
         setattr(equipment, field, value)
     try:
         db.commit()
