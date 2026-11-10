@@ -34,7 +34,10 @@ test('shows fleet availability for the last 30 days', async ({ page }) => {
   await expect(page.getByTestId('kpi-available')).toContainText('3');
   await expect(page.getByTestId('kpi-reserved')).toContainText('2');
   await expect(page.getByTestId('kpi-service-defective')).toContainText('3');
-  await expect(page.getByText('Status is a snapshot as of today', { exact: false })).toBeVisible();
+  await expect(page.getByTestId('kpi-total').locator('.material-symbols-rounded')).toHaveText('construction');
+  await expect(page.getByTestId('kpi-available').locator('.material-symbols-rounded')).toHaveText('check_circle');
+  await expect(page.getByTestId('kpi-reserved').locator('.material-symbols-rounded')).toHaveText('event_available');
+  await expect(page.getByTestId('kpi-service-defective').locator('.material-symbols-rounded')).toHaveText('build');
   await expect(page.getByRole('radio', { name: '30 days' })).toBeChecked();
 });
 

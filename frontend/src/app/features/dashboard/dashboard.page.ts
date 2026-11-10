@@ -44,11 +44,7 @@ import { DashboardService, fleetPeriod, FleetPeriodPreset } from './dashboard.se
         <mat-button-toggle value="1y">1 year</mat-button-toggle>
       </mat-button-toggle-group>
     </app-page-header>
-    <section aria-labelledby="fleet-heading" [attr.aria-busy]="loading()">
-      <h2 id="fleet-heading">Fleet availability</h2>
-      <p class="text-caption">
-        Status is a snapshot as of today. Total equipment includes retired equipment.
-      </p>
+    <section aria-label="Fleet overview" [attr.aria-busy]="loading()">
       @if (loading()) {
         <div class="card"><mat-progress-bar data-testid="fleet-loading" mode="indeterminate" /></div>
       } @else if (failed()) {
@@ -60,8 +56,11 @@ import { DashboardService, fleetPeriod, FleetPeriodPreset } from './dashboard.se
         <div class="grid" data-testid="fleet-kpis">
           @for (kpi of kpis(); track kpi.label) {
             <div class="kpi" [attr.data-testid]="kpi.testId">
-              <span class="text-caption">{{ kpi.label }}</span>
-              <span class="text-display num">{{ kpi.value }}</span>
+              <span class="material-symbols-rounded kpi-icon" aria-hidden="true">{{ kpi.icon }}</span>
+              <div class="kpi-details">
+                <span class="text-caption">{{ kpi.label }}</span>
+                <span class="text-display num">{{ kpi.value }}</span>
+              </div>
             </div>
           }
         </div>
@@ -109,6 +108,9 @@ import { DashboardService, fleetPeriod, FleetPeriodPreset } from './dashboard.se
   styles: `
     app-page-header { align-items: flex-start; }
     .period-toggle { --mat-button-toggle-height: var(--space-6); }
+    .kpi { flex-direction: row; align-items: center; gap: var(--space-4); }
+    .kpi-icon { font-size: var(--space-7); color: var(--color-text-muted); }
+    .kpi-details { display: flex; flex-direction: column; gap: var(--space-1); }
     .charts { margin-top: var(--space-5); align-items: start; }
     .status-chart { height: calc(var(--space-8) * 5); }
     .utilization-chart { height: calc(var(--space-8) * 7); }
@@ -177,13 +179,14 @@ export class DashboardPage {
     const count = (status: EquipmentStatus) =>
       data?.by_status.find((item) => item.status === status)?.count ?? 0;
     return [
-      { label: 'Total equipment', value: data?.total_equipment ?? 0, testId: 'kpi-total' },
-      { label: 'Available', value: count('available'), testId: 'kpi-available' },
-      { label: 'Reserved', value: count('reserved'), testId: 'kpi-reserved' },
+      { label: 'Total equipment', value: data?.total_equipment ?? 0, testId: 'kpi-total', icon: 'construction' },
+      { label: 'Available', value: count('available'), testId: 'kpi-available', icon: 'check_circle' },
+      { label: 'Reserved', value: count('reserved'), testId: 'kpi-reserved', icon: 'event_available' },
       {
         label: 'In service / defective',
         value: count('in_service') + count('defective'),
         testId: 'kpi-service-defective',
+        icon: 'build',
       },
     ];
   });
