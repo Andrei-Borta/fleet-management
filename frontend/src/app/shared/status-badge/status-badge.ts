@@ -9,7 +9,10 @@ export type Status =
   | 'pending'
   | 'approved'
   | 'rejected'
-  | 'cancelled';
+  | 'cancelled'
+  | 'planned'
+  | 'in_progress'
+  | 'done';
 
 const TONE: Record<Status, string> = {
   available: 'available',
@@ -21,6 +24,9 @@ const TONE: Record<Status, string> = {
   retired: 'retired',
   cancelled: 'retired',
   pending: 'pending',
+  planned: 'pending',
+  in_progress: 'service',
+  done: 'available',
 };
 
 /** The ONLY way to render a status (docs/STYLE_GUIDE.md §3.3). */

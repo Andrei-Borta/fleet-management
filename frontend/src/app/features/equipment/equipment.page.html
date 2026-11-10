@@ -1,4 +1,6 @@
-<app-page-header title="Equipment" subtitle="All machines in the fleet" />
+<app-page-header title="Equipment" subtitle="All machines in the fleet">
+  <a mat-flat-button routerLink="/equipment/new">Add equipment</a>
+</app-page-header>
 
 <section class="filters-bar" aria-label="Equipment filters">
   <mat-form-field appearance="outline" subscriptSizing="dynamic">
@@ -61,7 +63,7 @@
             Name
           </th>
           <td mat-cell *matCellDef="let item">
-            {{ item.name }}
+            <a [routerLink]="['/equipment', item.id]">{{ item.name }}</a>
           </td>
         </ng-container>
         <ng-container matColumnDef="type">

@@ -1,0 +1,138 @@
+<app-page-header [title]="equipment()?.name || 'Equipment details'">
+  <a mat-button routerLink="/equipment">Back to equipment</a>
+  @if (equipment()) {
+    <a mat-flat-button [routerLink]="['/equipment', id, 'edit']">Edit equipment</a>
+  }
+</app-page-header>
+
+<section class="card" [attr.aria-busy]="loading()">
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Loading equipment" />
+  } @else if (failed()) {
+    <div class="empty-state">
+      <span class="material-symbols-rounded" aria-hidden="true">error</span>
+      <p>Equipment could not be loaded.</p>
+      <button mat-stroked-button (click)="load()">Retry</button>
+    </div>
+  } @else if (equipment(); as item) {
+    <mat-tab-group (selectedIndexChange)="loadTab($event)">
+      <mat-tab label="Info">
+        <dl class="form-grid tab-content">
+          <div>
+            <dt>Type</dt>
+            <dd>{{ item.type }}</dd>
+          </div>
+          <div>
+            <dt>Serial number</dt>
+            <dd>{{ item.serial_no }}</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd><app-status-badge [status]="item.status" /></dd>
+          </div>
+          <div>
+            <dt>Engine hours</dt>
+            <dd class="num">{{ item.engine_hours | number }}</dd>
+          </div>
+          <div>
+            <dt>Hourly cost</dt>
+            <dd class="num">{{ item.hourly_cost | currency: 'RON' : 'code' : '1.2-2' : 'ro' }}</dd>
+          </div>
+          <div>
+            <dt>Service interval</dt>
+            <dd>
+              @if (item.service_interval_days !== null) {
+                {{ item.service_interval_days }} days
+              }
+              @if (item.service_interval_days !== null && item.service_interval_hours !== null) {
+                /
+              }
+              @if (item.service_interval_hours !== null) {
+                {{ item.service_interval_hours | number }} hours
+              }
+              @if (item.service_interval_days === null && item.service_interval_hours === null) {
+                —
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Last service date</dt>
+            <dd>{{ (item.last_service_at | date: 'dd MMM yyyy') ?? '—' }}</dd>
+          </div>
+          <div>
+            <dt>Engine hours at last service</dt>
+            <dd>{{ (item.last_service_hours | number) ?? '—' }}</dd>
+          </div>
+        </dl>
+      </mat-tab>
+      <mat-tab label="Reservations">
+        <div class="tab-content" [attr.aria-busy]="loadingReservations()">
+          @if (loadingReservations()) {
+            <mat-progress-bar mode="indeterminate" aria-label="Loading reservations" />
+          } @else if (reservationsFailed()) {
+            <div class="empty-state">
+              <span class="material-symbols-rounded" aria-hidden="true">error</span>
+              <p>Reservations could not be loaded.</p>
+              <button mat-stroked-button (click)="loadReservations()">Retry</button>
+            </div>
+          } @else if (reservations(); as history) {
+            <ul aria-label="Equipment reservations">
+              @for (reservation of history; track reservation.id) {
+                <li>
+                  @if (hasSiteDetails) {
+                    <a [routerLink]="['/sites', reservation.site_id]"
+                      >Site #{{ reservation.site_id }}</a
+                    >
+                  } @else {
+                    <span>Site #{{ reservation.site_id }}</span>
+                  }
+                  · {{ reservation.start_date | date: 'dd MMM yyyy' }} –
+                  {{ reservation.end_date | date: 'dd MMM yyyy' }}
+                  <app-status-badge [status]="reservation.status" />
+                  @if (reservation.note) {
+                    <div class="text-muted">{{ reservation.note }}</div>
+                  }
+                </li>
+              } @empty {
+                <li class="empty-state">No reservations for this equipment.</li>
+              }
+            </ul>
+          }
+        </div>
+      </mat-tab>
+      <mat-tab label="Maintenance">
+        <div class="tab-content" [attr.aria-busy]="loadingInterventions()">
+          @if (loadingInterventions()) {
+            <mat-progress-bar mode="indeterminate" aria-label="Loading maintenance history" />
+          } @else if (interventionsError()) {
+            <div class="empty-state" role="status">
+              <span class="material-symbols-rounded" aria-hidden="true">error</span>
+              <p>{{ interventionsError() }}</p>
+              <button mat-stroked-button (click)="loadInterventions()">Retry</button>
+            </div>
+          } @else if (interventions(); as history) {
+            <ul aria-label="Maintenance interventions">
+              @for (intervention of history; track intervention.id) {
+                <li>
+                  <strong>{{ intervention.kind | titlecase }}</strong>
+                  · {{ intervention.scheduled_date | date: 'dd MMM yyyy' }}
+                  <app-status-badge [status]="intervention.status" />
+                  @if (intervention.description) {
+                    <div>{{ intervention.description }}</div>
+                  }
+                  @if (intervention.completed_at) {
+                    <div class="text-muted">
+                      Completed {{ intervention.completed_at | date: 'dd MMM yyyy' }}
+                    </div>
+                  }
+                </li>
+              } @empty {
+                <li class="empty-state">No maintenance interventions for this equipment.</li>
+              }
+            </ul>
+          }
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  }
+</section>

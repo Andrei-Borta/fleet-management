@@ -58,6 +58,7 @@ deep-yellow accent that recalls construction machinery.
 | `pending` | `--status-pending-fg/bg` (amber soft) | Reservation awaiting approval |
 | `approved` | = available | Reservation approved |
 | `rejected` / `cancelled` | = defective / retired | Reservation closed |
+| `planned` / `in_progress` / `done` | = pending / in service / available | Maintenance intervention status |
 
 Semantic colours for feedback: `--color-success`, `--color-warning`, `--color-danger`, `--color-info`.
 

@@ -10,6 +10,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSort, MatSortModule } from '@angular/material/sort';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
+import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
 import { PageHeader } from '../../shared/page-header/page-header';
@@ -32,6 +33,7 @@ import { EquipmentService } from './equipment.service';
     MatSortModule,
     MatTableModule,
     PageHeader,
+    RouterLink,
     StatusBadge,
   ],
   templateUrl: './equipment.page.html',
