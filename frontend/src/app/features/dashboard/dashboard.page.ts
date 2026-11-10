@@ -1,9 +1,7 @@
 import { DOCUMENT } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import {
   ArcElement,
@@ -24,41 +22,32 @@ import { PageHeader } from '../../shared/page-header/page-header';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
 import { EquipmentStatus } from '../equipment/equipment.models';
 import { FleetPeriod, FleetStats } from './dashboard.models';
-import { DashboardService, defaultFleetPeriod } from './dashboard.service';
+import { DashboardService, fleetPeriod, FleetPeriodPreset } from './dashboard.service';
 
 @Component({
   selector: 'app-dashboard-page',
   imports: [
-    PageHeader, StatusBadge, FormsModule, MatButtonModule, MatFormFieldModule,
-    MatInputModule, MatProgressBarModule, BaseChartDirective,
+    PageHeader, StatusBadge, MatButtonModule, MatButtonToggleModule,
+    MatProgressBarModule, BaseChartDirective,
   ],
   providers: [provideCharts({
     registerables: [ArcElement, BarController, BarElement, CategoryScale, DoughnutController, LinearScale, Tooltip],
   })],
   template: `
-    <app-page-header title="Dashboard" subtitle="Fleet overview" />
-
-    <form class="filters-bar" (ngSubmit)="applyPeriod()" novalidate>
-      <mat-form-field appearance="outline" subscriptSizing="dynamic">
-        <mat-label>From</mat-label>
-        <input matInput type="date" name="from" required [ngModel]="from()"
-          (ngModelChange)="from.set($event)" [disabled]="loading()" data-testid="period-from" />
-      </mat-form-field>
-      <mat-form-field appearance="outline" subscriptSizing="dynamic">
-        <mat-label>To</mat-label>
-        <input matInput type="date" name="to" required [ngModel]="to()"
-          (ngModelChange)="to.set($event)" [disabled]="loading()" data-testid="period-to" />
-      </mat-form-field>
-      <button mat-stroked-button type="submit" [disabled]="loading()">Apply period</button>
-      @if (periodError()) {
-        <p role="alert">{{ periodError() }}</p>
-      }
-    </form>
+    <app-page-header title="Dashboard" subtitle="Fleet overview">
+      <mat-button-toggle-group class="period-toggle" aria-label="Utilization period"
+        [value]="preset()" [disabled]="loading()" (change)="selectPeriod($event.value)"
+        hideSingleSelectionIndicator>
+        <mat-button-toggle value="30d">30 days</mat-button-toggle>
+        <mat-button-toggle value="3m">3 months</mat-button-toggle>
+        <mat-button-toggle value="6m">6 months</mat-button-toggle>
+        <mat-button-toggle value="1y">1 year</mat-button-toggle>
+      </mat-button-toggle-group>
+    </app-page-header>
     <section aria-labelledby="fleet-heading" [attr.aria-busy]="loading()">
       <h2 id="fleet-heading">Fleet availability</h2>
       <p class="text-caption">
-        Status is a snapshot as of today when today is within the selected period, otherwise as of the period end.
-        Total equipment includes retired equipment.
+        Status is a snapshot as of today. Total equipment includes retired equipment.
       </p>
       @if (loading()) {
         <div class="card"><mat-progress-bar data-testid="fleet-loading" mode="indeterminate" /></div>
@@ -118,8 +107,8 @@ import { DashboardService, defaultFleetPeriod } from './dashboard.service';
     </section>
   `,
   styles: `
-    .filters-bar { align-items: center; }
-    .filters-bar p { flex-basis: 100%; margin: 0; }
+    app-page-header { align-items: flex-start; }
+    .period-toggle { --mat-button-toggle-height: var(--space-6); }
     .charts { margin-top: var(--space-5); align-items: start; }
     .status-chart { height: calc(var(--space-8) * 5); }
     .utilization-chart { height: calc(var(--space-8) * 7); }
@@ -137,10 +126,8 @@ export class DashboardPage {
   ];
   protected readonly pageSize = 8;
   protected readonly page = signal(0);
-  private appliedPeriod: FleetPeriod = defaultFleetPeriod();
-  protected readonly from = signal(this.appliedPeriod.from);
-  protected readonly to = signal(this.appliedPeriod.to);
-  protected readonly periodError = signal('');
+  protected readonly preset = signal<FleetPeriodPreset>('30d');
+  private appliedPeriod: FleetPeriod = fleetPeriod('30d');
   protected readonly fleet = signal<FleetStats | null>(null);
   protected readonly loading = signal(false);
   protected readonly failed = signal(false);
@@ -215,19 +202,9 @@ export class DashboardPage {
     return tokens.map((token) => styles?.getPropertyValue(token).trim() ?? '');
   }
 
-  protected applyPeriod(): void {
-    const from = this.from();
-    const to = this.to();
-    if (!from || !to) {
-      this.periodError.set('Choose both dates.');
-      return;
-    }
-    if (to < from) {
-      this.periodError.set('End date must not be before start date.');
-      return;
-    }
-    this.periodError.set('');
-    this.appliedPeriod = { from, to };
+  protected selectPeriod(preset: FleetPeriodPreset): void {
+    this.preset.set(preset);
+    this.appliedPeriod = fleetPeriod(preset);
     this.page.set(0);
     this.load();
   }

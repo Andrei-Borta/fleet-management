@@ -1,13 +1,17 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { API_URL } from '../../core/api';
-import { toLocalIsoDate } from '../../shared/date-utils';
+import { addCalendarMonths, toLocalIsoDate } from '../../shared/date-utils';
 import { FleetPeriod, FleetStats } from './dashboard.models';
 
-/** The last 30 local calendar days, including today. */
-export function defaultFleetPeriod(today = new Date()): FleetPeriod {
-  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  start.setDate(start.getDate() - 29);
+export type FleetPeriodPreset = '30d' | '3m' | '6m' | '1y';
+
+/** An inclusive period ending today; month-based presets use calendar months. */
+export function fleetPeriod(preset: FleetPeriodPreset, today = new Date()): FleetPeriod {
+  const start = preset === '30d'
+    ? new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    : addCalendarMonths(today, -(preset === '3m' ? 3 : preset === '6m' ? 6 : 12));
+  start.setDate(start.getDate() + (preset === '30d' ? -29 : 1));
   return { from: toLocalIsoDate(start), to: toLocalIsoDate(today) };
 }
 

@@ -35,11 +35,11 @@ test('shows fleet availability for the last 30 days', async ({ page }) => {
   await expect(page.getByTestId('kpi-reserved')).toContainText('2');
   await expect(page.getByTestId('kpi-service-defective')).toContainText('3');
   await expect(page.getByText('Status is a snapshot as of today', { exact: false })).toBeVisible();
-  await expect(page.getByTestId('period-from')).toHaveValue('2026-10-12');
-  await expect(page.getByTestId('period-to')).toHaveValue('2026-11-10');
+  await expect(page.getByRole('radio', { name: '30 days' })).toBeChecked();
 });
 
-test('validates and applies a custom inclusive period', async ({ page }) => {
+test('selects preset periods ending today, including month-end and leap-year dates', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2024-05-31T12:00:00'));
   const requests: string[] = [];
   await page.route('**/api/v1/dashboard/fleet?*', async (route) => {
     const url = new URL(route.request().url());
@@ -48,20 +48,17 @@ test('validates and applies a custom inclusive period', async ({ page }) => {
   });
   await page.goto('/dashboard');
   await expect(page.getByTestId('kpi-total')).toContainText('1');
-  await page.getByTestId('period-from').fill('2026-06-10');
-  await page.getByTestId('period-to').fill('2026-06-01');
-  await page.getByRole('button', { name: 'Apply period' }).click();
-  await expect(page.getByRole('alert')).toHaveText('End date must not be before start date.');
-  expect(requests).toHaveLength(1);
-  await page.getByTestId('period-to').fill('');
-  await page.getByRole('button', { name: 'Apply period' }).click();
-  await expect(page.getByRole('alert')).toHaveText('Choose both dates.');
-  expect(requests).toHaveLength(1);
-  await page.getByTestId('period-to').fill('2026-06-10');
-  await page.getByRole('button', { name: 'Apply period' }).click();
-  await expect(page.getByTestId('kpi-total')).toContainText('2');
-  expect(requests[1]).toBe('2026-06-10/2026-06-10');
-  await expect(page.getByRole('alert')).toHaveCount(0);
+  for (const [label, expected] of [
+    ['3 months', '2024-03-01/2024-05-31'],
+    ['6 months', '2023-12-01/2024-05-31'],
+    ['1 year', '2023-06-01/2024-05-31'],
+    ['30 days', '2024-05-02/2024-05-31'],
+  ]) {
+    await page.getByRole('radio', { name: label }).click();
+    await expect(page.getByRole('radio', { name: label })).toBeChecked();
+    await expect(page.getByTestId('kpi-total')).toContainText(String(requests.length));
+    expect(requests.at(-1)).toBe(expected);
+  }
 });
 
 test('shows chart data and updates utilization for the selected period', async ({ page }) => {
@@ -77,9 +74,7 @@ test('shows chart data and updates utilization for the selected period', async (
   const utilization = page.getByRole('list', { name: 'Equipment utilization' });
   await expect(utilization.getByRole('listitem').filter({ hasText: 'Excavator' })).toContainText('50%');
   await expect(utilization.getByRole('listitem').filter({ hasText: 'Loader' })).toContainText('0%');
-  await page.getByTestId('period-from').fill('2026-06-01');
-  await page.getByTestId('period-to').fill('2026-06-30');
-  await page.getByRole('button', { name: 'Apply period' }).click();
+  await page.getByRole('radio', { name: '3 months' }).click();
   await expect(utilization.getByRole('listitem')).toHaveCount(1);
   await expect(utilization.getByRole('listitem').first()).toContainText('75%');
   await expect(page.locator('canvas')).toHaveCount(2);
@@ -108,6 +103,7 @@ test('pages through utilization without dropping equipment', async ({ page }) =>
 });
 
 test('retries the applied period after a failed request', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-11-10T12:00:00'));
   let attempts = 0;
   const requests: string[] = [];
   await page.route('**/api/v1/dashboard/fleet?*', async (route) => {
@@ -122,13 +118,11 @@ test('retries the applied period after a failed request', async ({ page }) => {
   });
   await page.goto('/dashboard');
   await expect(page.getByTestId('kpi-total')).toBeVisible();
-  await page.getByTestId('period-from').fill('2026-06-01');
-  await page.getByTestId('period-to').fill('2026-06-30');
-  await page.getByRole('button', { name: 'Apply period' }).click();
+  await page.getByRole('radio', { name: '3 months' }).click();
   await expect(page.getByText('Fleet availability could not be loaded.')).toBeVisible();
   await page.getByRole('button', { name: 'Retry' }).click();
   await expect(page.getByTestId('kpi-total')).toBeVisible();
-  expect(requests.slice(1)).toEqual(['2026-06-01/2026-06-30', '2026-06-01/2026-06-30']);
+  expect(requests.slice(1)).toEqual(['2026-08-11/2026-11-10', '2026-08-11/2026-11-10']);
 });
 
 test('shows zero counts and an empty state for an empty fleet', async ({ page }) => {
@@ -170,12 +164,13 @@ for (const width of [375, 1440]) {
     await page.route('**/api/v1/dashboard/fleet?*', (route) => route.fulfill({ json: fleet }));
     await page.goto('/dashboard');
     await expect(page.getByTestId('fleet-kpis')).toBeVisible();
+    const title = await page.getByTestId('page-title').boundingBox();
+    const toggle = await page.getByRole('radiogroup', { name: 'Utilization period' }).boundingBox();
+    expect(title).not.toBeNull();
+    expect(toggle).not.toBeNull();
     if (width === 1440) {
-      const field = await page.getByTestId('period-from').locator('..').boundingBox();
-      const button = await page.getByRole('button', { name: 'Apply period' }).boundingBox();
-      expect(field).not.toBeNull();
-      expect(button).not.toBeNull();
-      expect(Math.abs(field!.y + field!.height / 2 - (button!.y + button!.height / 2))).toBeLessThan(3);
+      expect(toggle!.x).toBeGreaterThan(title!.x + title!.width);
+      expect(Math.abs(toggle!.y - title!.y)).toBeLessThan(5);
     }
     for (const theme of ['light', 'dark']) {
       if (theme === 'dark') await page.getByTestId('theme-toggle').click();
