@@ -33,6 +33,7 @@ npm ci
 npx playwright install chromium     # browsers for the E2E tests
 ```
 Add a dependency with `npm install X` (commit `package-lock.json`). Always use `npm ci` for clean installs.
+Angular CLI usage analytics are disabled for the project (`"analytics": false` in `angular.json`). Never commit an `"analytics": "<id>"` value.
 
 ## Database
 ```bash
