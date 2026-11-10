@@ -22,6 +22,7 @@ from app.modules.reservations.service import (
     ensure_reservable,
     find_conflicts,
     has_approved_outside_site_dates,
+    has_upcoming_approved_reservation,
     list_reservations,
     periods_overlap,
     reject_reservation,
@@ -154,6 +155,28 @@ def test_approved_reservations_outside_site_dates(
     db.flush()
     assert has_approved_outside_site_dates(db, site.id, D(2026, 2, 1), D(2026, 2, 28)) is expected
     assert not has_approved_outside_site_dates(db, site.id + 1000000, D(2026, 2, 1), D(2026, 2, 28))
+
+
+@pytest.mark.parametrize(
+    ("status", "start", "end", "expected"),
+    [
+        (ReservationStatus.APPROVED, D(2026, 6, 1), D(2026, 6, 10), True),  # ends in the future
+        (ReservationStatus.APPROVED, D(2026, 5, 1), D(2026, 6, 1), True),  # ends today
+        (ReservationStatus.APPROVED, D(2026, 5, 1), D(2026, 5, 31), False),  # ended yesterday
+        (ReservationStatus.PENDING, D(2026, 6, 1), D(2026, 6, 10), False),
+        (ReservationStatus.REJECTED, D(2026, 6, 1), D(2026, 6, 10), False),
+        (ReservationStatus.CANCELLED, D(2026, 6, 1), D(2026, 6, 10), False),
+    ],
+)
+def test_has_upcoming_approved_reservation(
+    db: Session, status: ReservationStatus, start: date, end: date, expected: bool
+) -> None:
+    equipment = make_equipment(db)
+    other = make_equipment(db)
+    assert not has_upcoming_approved_reservation(db, equipment.id, D(2026, 6, 1))
+    make_reservation(db, equipment, start, end, status)
+    assert has_upcoming_approved_reservation(db, equipment.id, D(2026, 6, 1)) is expected
+    assert not has_upcoming_approved_reservation(db, other.id, D(2026, 6, 1))
 
 
 def test_approved_reservations_outside_site_dates_rejects_inverted_range(db: Session) -> None:

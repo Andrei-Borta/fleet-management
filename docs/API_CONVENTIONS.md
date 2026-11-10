@@ -16,6 +16,17 @@
 - Frontend error handling relies on this error format: the HTTP interceptor shows `detail` (a string,
   or FastAPI's list of validation errors) for every error except `409`, which the calling page
   handles. `alternatives` is optional in a `409` body. See `frontend/src/app/core/README.md`.
+- `GET /equipment` filters: `?type=`, `?status=` and `?available_from=&available_to=` (both required
+  together, inclusive dates, `422` otherwise). With a period, only equipment that can be reserved for it
+  is returned: not defective, in service or retired, with no approved reservation or open maintenance
+  overlapping it. A duplicate `serial_no` on create or update is a `409`.
+- Equipment with reservations, defects or service history cannot be deleted (409), preserving the
+  history. Retire it with `PATCH {"status": "retired"}` instead.
+- `POST` and `PATCH /equipment` only accept the status `available` or `retired` (`422` otherwise).
+  `defective` and `in_service` are set by the maintenance logic, and `reserved` is derived from approved
+  reservations. Retiring equipment with an approved reservation ending today or later is a `409`.
+  Setting `defective` or `in_service` equipment to `available` is a `409` too; only the maintenance
+  logic clears that block. Such equipment can still be edited otherwise, or retired.
 - Sites with any reservations cannot be deleted (409), preserving reservation history and site
   cost reporting. Remove a site only when no reservations reference it.
 - A site's dates cannot be changed to exclude an approved reservation (409). A reservation outside
