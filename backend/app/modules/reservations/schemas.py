@@ -69,3 +69,26 @@ class ReservationConflictBody(BaseModel):
     detail: str
     conflicts: list[ConflictRead]
     alternatives: list[AlternativeRead] = []
+
+
+class CalendarEquipmentRead(BaseModel):
+    id: int
+    name: str
+    type: str
+
+
+class CalendarSiteRead(BaseModel):
+    id: int
+    name: str
+
+
+class CalendarEventRead(BaseModel):
+    """One block on the central calendar: a reservation or a maintenance job."""
+
+    type: Literal["reservation", "maintenance"]
+    id: int  # reservation id or service intervention id, depending on `type`
+    equipment: CalendarEquipmentRead
+    site: CalendarSiteRead | None  # None for maintenance, which belongs to no site
+    start: date
+    end: date | None  # None: maintenance in progress, no known end yet
+    status: str

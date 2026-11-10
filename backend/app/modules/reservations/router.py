@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Request, status
@@ -7,6 +8,7 @@ from app.core.deps import CurrentRole, DbSession
 from app.modules.reservations import service
 from app.modules.reservations.models import ReservationStatus
 from app.modules.reservations.schemas import (
+    CalendarEventRead,
     ReservationConflictBody,
     ReservationCreate,
     ReservationRead,
@@ -33,6 +35,17 @@ def list_reservations(
 ) -> list[ReservationRead]:
     reservations = service.list_reservations(db, site_id, equipment_id, reservation_status)
     return [ReservationRead.model_validate(reservation) for reservation in reservations]
+
+
+@router.get("/calendar", response_model=list[CalendarEventRead])
+def calendar(
+    db: DbSession,
+    range_start: Annotated[date, Query(alias="from")],
+    range_end: Annotated[date, Query(alias="to")],
+    site_id: int | None = None,
+    equipment_id: int | None = None,
+) -> list[CalendarEventRead]:
+    return service.list_calendar_events(db, range_start, range_end, site_id, equipment_id)
 
 
 @router.post(
