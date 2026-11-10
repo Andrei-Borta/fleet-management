@@ -20,6 +20,7 @@ from app.modules.reservations.service import (
     cancel_reservation,
     create_reservation,
     ensure_reservable,
+    find_alternatives,
     find_conflicts,
     has_approved_outside_site_dates,
     has_upcoming_approved_reservation,
@@ -508,3 +509,90 @@ def test_cancelling_frees_the_period(db):
 def test_actions_reject_unknown_reservation(db, action):
     with pytest.raises(NotFoundError):
         action(db, 99999999)
+
+
+def test_find_alternatives_returns_free_equipment_of_the_same_type_cheapest_first(db):
+    requested = make_equipment(db, type_="crane-x")
+    expensive = make_equipment(db, type_="crane-x", hourly_cost=90)
+    cheap = make_equipment(db, type_="crane-x", hourly_cost=30)
+    make_equipment(db, type_="loader-x", hourly_cost=1)
+
+    alternatives = find_alternatives(db, requested.id, BOOKED_START, BOOKED_END)
+
+    assert [e.id for e in alternatives] == [cheap.id, expensive.id]
+
+
+def test_find_alternatives_breaks_cost_ties_by_id(db):
+    requested = make_equipment(db, type_="crane-x")
+    first = make_equipment(db, type_="crane-x", hourly_cost=30)
+    second = make_equipment(db, type_="crane-x", hourly_cost=30)
+
+    alternatives = find_alternatives(db, requested.id, BOOKED_START, BOOKED_END)
+
+    assert [e.id for e in alternatives] == [first.id, second.id]
+
+
+@pytest.mark.parametrize(
+    "status",
+    [EquipmentStatus.DEFECTIVE, EquipmentStatus.IN_SERVICE, EquipmentStatus.RETIRED],
+)
+def test_find_alternatives_excludes_blocked_equipment(db, status):
+    requested = make_equipment(db, type_="crane-x")
+    make_equipment(db, type_="crane-x", status=status)
+
+    assert find_alternatives(db, requested.id, BOOKED_START, BOOKED_END) == []
+
+
+def test_find_alternatives_excludes_booked_equipment_and_maintenance(db):
+    requested = make_equipment(db, type_="crane-x")
+    make_reservation(db, make_equipment(db, type_="crane-x"))
+    make_intervention(db, make_equipment(db, type_="crane-x"))
+
+    assert find_alternatives(db, requested.id, BOOKED_START, BOOKED_END) == []
+
+
+def test_find_alternatives_includes_equipment_free_outside_its_bookings(db):
+    requested = make_equipment(db, type_="crane-x")
+    free = make_equipment(db, type_="crane-x")
+    make_reservation(db, free, start=D(2026, 12, 1), end=D(2026, 12, 5))
+
+    alternatives = find_alternatives(db, requested.id, BOOKED_START, BOOKED_END)
+
+    assert [e.id for e in alternatives] == [free.id]
+
+
+def test_find_alternatives_rejects_unknown_equipment(db):
+    with pytest.raises(NotFoundError):
+        find_alternatives(db, 99999999, BOOKED_START, BOOKED_END)
+
+
+def test_find_alternatives_rejects_inverted_period(db):
+    with pytest.raises(InvalidDataError):
+        find_alternatives(db, make_equipment(db).id, BOOKED_END, BOOKED_START)
+
+
+def test_ensure_reservable_offers_alternatives_for_a_booked_machine(db):
+    type_ = f"type-{uuid4().hex}"
+    equipment = make_equipment(db, type_=type_)
+    make_reservation(db, equipment)
+    free = make_equipment(db, type_=type_)
+
+    with pytest.raises(ReservationConflictError) as error:
+        ensure_reservable(db, equipment.id, BOOKED_START, BOOKED_END)
+
+    assert [a.id for a in error.value.alternatives] == [free.id]
+
+
+def test_ensure_reservable_offers_alternatives_for_a_blocked_machine(db):
+    type_ = f"type-{uuid4().hex}"
+    equipment = make_equipment(db, type_=type_, status=EquipmentStatus.DEFECTIVE)
+    free = make_equipment(db, type_=type_)
+
+    with pytest.raises(ReservationConflictError) as error:
+        ensure_reservable(db, equipment.id, BOOKED_START, BOOKED_END)
+
+    assert [a.id for a in error.value.alternatives] == [free.id]
+
+
+def test_reservation_conflict_error_defaults_to_no_alternatives():
+    assert ReservationConflictError("Busy", []).alternatives == []
