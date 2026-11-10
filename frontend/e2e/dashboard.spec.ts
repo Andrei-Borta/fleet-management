@@ -36,6 +36,16 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/v1/reservations?status=pending', (route) => route.fulfill({ json: [] }));
 });
 
+test('shows the service-due placeholder and opens maintenance', async ({ page }) => {
+  await page.route('**/api/v1/dashboard/fleet?*', (route) => route.fulfill({ json: fleet }));
+  await page.goto('/dashboard');
+  const widget = page.getByRole('region', { name: 'Service due' });
+  await expect(widget.getByText('Service-due information is coming soon.')).toBeVisible();
+  await widget.getByRole('link', { name: 'View maintenance' }).click();
+  await expect(page).toHaveURL(/\/maintenance$/);
+  await expect(page.getByRole('heading', { name: 'Maintenance' })).toBeVisible();
+});
+
 test('shows pending requests and opens the pending reservations tab', async ({ page }) => {
   await page.route('**/api/v1/dashboard/fleet?*', (route) => route.fulfill({ json: fleet }));
   await page.route('**/api/v1/reservations?status=pending', (route) =>
@@ -51,6 +61,28 @@ test('shows pending requests and opens the pending reservations tab', async ({ p
   await expect(page).toHaveURL(/\/reservations$/);
   await expect(page.getByRole('tab', { name: 'Pending' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('cell', { name: 'Bridge' })).toBeVisible();
+});
+
+test('keeps dashboard widgets equal in height with aligned actions', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.route('**/api/v1/dashboard/fleet?*', (route) => route.fulfill({ json: fleet }));
+  await page.route('**/api/v1/reservations?status=pending', (route) =>
+    route.fulfill({ json: [pendingRequest] }),
+  );
+  await page.goto('/dashboard');
+  const due = page.getByRole('region', { name: 'Service due' });
+  const pending = page.getByRole('region', { name: 'Pending requests' });
+  await expect(pending).toContainText('1 request awaiting approval');
+  const dueBox = await due.boundingBox();
+  const pendingBox = await pending.boundingBox();
+  const dueButton = await due.getByRole('link', { name: 'View maintenance' }).boundingBox();
+  const pendingButton = await pending.getByRole('link', { name: 'View requests' }).boundingBox();
+  expect(dueBox).not.toBeNull();
+  expect(pendingBox).not.toBeNull();
+  expect(dueButton).not.toBeNull();
+  expect(pendingButton).not.toBeNull();
+  expect(Math.abs(dueBox!.height - pendingBox!.height)).toBeLessThan(2);
+  expect(Math.abs(dueButton!.y - pendingButton!.y)).toBeLessThan(2);
 });
 
 test('shows an empty state for pending requests', async ({ page }) => {
@@ -380,6 +412,8 @@ for (const width of [375, 1440]) {
     for (const theme of ['light', 'dark']) {
       if (theme === 'dark') await page.getByTestId('theme-toggle').click();
       await expect(page.getByTestId('kpi-service-defective')).toBeVisible();
+      await expect(page.getByRole('region', { name: 'Service due' })).toBeVisible();
+      await expect(page.getByRole('region', { name: 'Pending requests' })).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
         width,
       );

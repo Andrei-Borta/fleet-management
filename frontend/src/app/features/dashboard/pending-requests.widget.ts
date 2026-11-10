@@ -34,7 +34,9 @@ import { DashboardService } from './dashboard.service';
     </section>
   `,
   styles: `
-    :host { display: block; margin-top: var(--space-5); }
+    :host { display: flex; }
+    section { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+    a { align-self: flex-start; margin-top: auto; }
   `,
 })
 export class PendingRequestsWidget {
