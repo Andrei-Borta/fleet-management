@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
@@ -25,6 +25,8 @@ import { EquipmentStatus } from '../equipment/equipment.models';
 import { FleetPeriod, FleetStats } from './dashboard.models';
 import { DashboardService, fleetPeriod, FleetPeriodPreset } from './dashboard.service';
 
+const LOAD_ANIMATION_MS = 600;
+
 @Component({
   selector: 'app-dashboard-page',
   imports: [
@@ -37,21 +39,22 @@ import { DashboardService, fleetPeriod, FleetPeriodPreset } from './dashboard.se
   template: `
     <app-page-header title="Dashboard" subtitle="Fleet overview" />
     <section aria-label="Fleet overview" [attr.aria-busy]="loading()">
-      @if (loading()) {
+      @if (loading() && !fleet()) {
         <div class="card"><mat-progress-bar data-testid="fleet-loading" mode="indeterminate" /></div>
-      } @else if (failed()) {
+      } @else if (failed() && !fleet()) {
         <div class="card empty-state">
           <p>Fleet availability could not be loaded.</p>
           <button mat-stroked-button (click)="load()">Retry</button>
         </div>
       } @else if (fleet(); as data) {
         <div class="grid" data-testid="fleet-kpis">
-          @for (kpi of kpis(); track kpi.label) {
+          @for (kpi of kpis(); track kpi.label; let index = $index) {
             <div class="kpi" [attr.data-testid]="kpi.testId">
               <span class="material-symbols-rounded kpi-icon" aria-hidden="true">{{ kpi.icon }}</span>
               <div class="kpi-details">
                 <span class="text-caption">{{ kpi.label }}</span>
-                <span class="text-display num">{{ kpi.value }}</span>
+                <span class="text-display num" aria-hidden="true">{{ displayedCounts()[index] }}</span>
+                <span class="visually-hidden">{{ kpi.value }}</span>
               </div>
             </div>
           }
@@ -65,7 +68,7 @@ import { DashboardService, fleetPeriod, FleetPeriodPreset } from './dashboard.se
             @if (data.total_equipment === 0) {
               <div class="empty-state"><p>No equipment to display.</p></div>
             } @else {
-              <div class="status-chart"><canvas baseChart [type]="'doughnut'" [data]="statusChart()" [options]="statusOptions" aria-hidden="true"></canvas></div>
+              <div class="status-chart"><canvas baseChart [type]="'doughnut'" [data]="statusChart()" [options]="statusOptions()" aria-hidden="true"></canvas></div>
               <ul class="status-list" aria-label="Status distribution">
                 @for (status of statuses; track status) {
                   <li><app-status-badge [status]="status" /><span class="num">{{ statusCount(status) }}</span></li>
@@ -73,7 +76,10 @@ import { DashboardService, fleetPeriod, FleetPeriodPreset } from './dashboard.se
               </ul>
             }
           </section>
-          <section class="card" aria-labelledby="utilization-heading">
+          <section class="card utilization-card" aria-labelledby="utilization-heading">
+            @if (loading()) {
+              <mat-progress-bar class="chart-progress" mode="indeterminate" aria-label="Updating utilization" />
+            }
             <div class="chart-header">
               <h2 id="utilization-heading">Utilization per equipment</h2>
               <mat-button-toggle-group class="period-toggle" aria-label="Utilization period"
@@ -85,6 +91,12 @@ import { DashboardService, fleetPeriod, FleetPeriodPreset } from './dashboard.se
                 <mat-button-toggle value="1y" aria-label="Last 1 year">1Y</mat-button-toggle>
               </mat-button-toggle-group>
             </div>
+            @if (failed()) {
+              <div class="empty-state">
+                <p>Fleet availability could not be loaded. Showing the previous period.</p>
+                <button mat-stroked-button (click)="load()">Retry</button>
+              </div>
+            }
             @if (data.utilization.length === 0) {
               <div class="empty-state"><p>No active equipment to display.</p></div>
             } @else {
@@ -96,9 +108,9 @@ import { DashboardService, fleetPeriod, FleetPeriodPreset } from './dashboard.se
               </ul>
               @if (data.utilization.length > pageSize) {
                 <div class="chart-pagination">
-                  <button mat-stroked-button (click)="page.set(page() - 1)" [disabled]="page() === 0"><span class="pagination-label"><span class="material-symbols-rounded" aria-hidden="true">arrow_back</span> Previous</span></button>
+                  <button mat-stroked-button (click)="changePage(-1)" [disabled]="page() === 0"><span class="pagination-label"><span class="material-symbols-rounded" aria-hidden="true">arrow_back</span> Previous</span></button>
                   <span class="text-muted num">{{ page() + 1 }} / {{ pageCount() }}</span>
-                  <button mat-stroked-button (click)="page.set(page() + 1)" [disabled]="page() + 1 >= pageCount()"><span class="pagination-label">Next <span class="material-symbols-rounded" aria-hidden="true">arrow_forward</span></span></button>
+                  <button mat-stroked-button (click)="changePage(1)" [disabled]="page() + 1 >= pageCount()"><span class="pagination-label">Next <span class="material-symbols-rounded" aria-hidden="true">arrow_forward</span></span></button>
                 </div>
               }
             }
@@ -116,6 +128,8 @@ import { DashboardService, fleetPeriod, FleetPeriodPreset } from './dashboard.se
     .kpi-details { display: flex; flex-direction: column; gap: var(--space-1); }
     .charts { margin-top: var(--space-5); }
     .charts > .card + .card { margin-top: 0; }
+    .utilization-card { position: relative; }
+    .chart-progress { position: absolute; top: 0; left: 0; right: 0; }
     .status-chart { height: calc(var(--space-8) * 5); }
     .utilization-chart { height: calc(var(--space-8) * 7); }
     .status-list { list-style: none; margin: var(--space-4) 0 0; padding: 0; }
@@ -131,6 +145,15 @@ export class DashboardPage {
   private readonly api = inject(DashboardService);
   private readonly document = inject(DOCUMENT);
   private readonly theme = inject(ThemeService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly reducedMotion = signal(true);
+  private readonly animateCharts = signal(false);
+  private readonly animateUtilization = signal(false);
+  private firstLoad = true;
+  private periodChanged = false;
+  private frameId: number | undefined;
+  private animationTimer: number | undefined;
+  protected readonly displayedCounts = signal<number[]>([]);
   protected readonly statuses: EquipmentStatus[] = [
     'available', 'reserved', 'in_service', 'defective', 'retired',
   ];
@@ -169,9 +192,10 @@ export class DashboardPage {
       label: 'Utilization',
     }],
   }));
-  protected readonly statusOptions: ChartOptions<'doughnut'> = {
-    responsive: true, maintainAspectRatio: false, animation: false,
-  };
+  protected readonly statusOptions = computed<ChartOptions<'doughnut'>>(() => ({
+    responsive: true, maintainAspectRatio: false,
+    animation: this.chartAnimation(this.animateCharts()),
+  }));
   protected readonly utilizationLabels: Plugin<'bar'>[] = [{
     id: 'utilizationLabels',
     afterDatasetsDraw: (chart) => {
@@ -182,7 +206,11 @@ export class DashboardPage {
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
       chart.getDatasetMeta(0).data.forEach((bar, index) => {
-        ctx.fillText(`${chart.data.datasets[0].data[index]}%`, chart.width - 4, bar.y);
+        const value = chart.scales['x'].getValueForPixel(bar.x) ?? 0;
+        const target = chart.data.datasets[0].data[index];
+        if (typeof target !== 'number') return;
+        const displayed = Math.min(100, Math.max(0, value));
+        ctx.fillText(`${Number(displayed.toFixed(2))}%`, chart.width - 4, bar.y);
       });
       ctx.restore();
     },
@@ -200,7 +228,8 @@ export class DashboardPage {
     );
     const gap = Number.parseFloat(this.colors(['--space-4'])[0]) || 16;
     return {
-      indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: false,
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      animation: this.chartAnimation(this.animateCharts() || this.animateUtilization()),
       layout: { padding: { right: Math.ceil(widestLabel) + gap + 4 } },
       scales: {
         x: { min: 0, max: 100, ticks: { color: text, callback: (value) => `${value}%` }, grid: { color: grid } },
@@ -226,7 +255,60 @@ export class DashboardPage {
   });
 
   constructor() {
+    const media = this.document.defaultView?.matchMedia('(prefers-reduced-motion: reduce)');
+    this.reducedMotion.set(media?.matches ?? true);
+    const onMotionChange = (event: MediaQueryListEvent) => {
+      this.reducedMotion.set(event.matches);
+      if (event.matches) this.stopAnimation();
+    };
+    media?.addEventListener('change', onMotionChange);
+    this.destroyRef.onDestroy(() => {
+      media?.removeEventListener('change', onMotionChange);
+      this.stopAnimation();
+    });
     this.load();
+  }
+
+  private chartAnimation(enabled: boolean): false | { duration: number; easing: 'easeOutCubic' } {
+    return enabled && !this.reducedMotion()
+      ? { duration: LOAD_ANIMATION_MS, easing: 'easeOutCubic' }
+      : false;
+  }
+
+  private stopAnimation(): void {
+    const view = this.document.defaultView;
+    if (this.frameId !== undefined) view?.cancelAnimationFrame(this.frameId);
+    if (this.animationTimer !== undefined) view?.clearTimeout(this.animationTimer);
+    this.frameId = undefined;
+    this.animationTimer = undefined;
+    this.animateCharts.set(false);
+    this.animateUtilization.set(false);
+    this.displayedCounts.set(this.kpis().map((item) => item.value));
+  }
+
+  private animateCounts(): void {
+    const view = this.document.defaultView;
+    const targets = this.kpis().map((item) => item.value);
+    if (!view || this.reducedMotion()) {
+      this.displayedCounts.set(targets);
+      return;
+    }
+    this.displayedCounts.set(targets.map(() => 0));
+    let start: number | undefined;
+    const tick = (time: number) => {
+      start ??= time;
+      const progress = Math.min((time - start) / LOAD_ANIMATION_MS, 1);
+      const eased = 1 - (1 - progress) ** 3;
+      this.displayedCounts.set(targets.map((value) => Math.round(value * eased)));
+      if (progress < 1) this.frameId = view.requestAnimationFrame(tick);
+      else this.frameId = undefined;
+    };
+    this.frameId = view.requestAnimationFrame(tick);
+  }
+
+  protected changePage(direction: number): void {
+    this.stopAnimation();
+    this.page.update((page) => page + direction);
   }
 
   protected statusCount(status: EquipmentStatus): number {
@@ -240,8 +322,10 @@ export class DashboardPage {
   }
 
   protected selectPeriod(preset: FleetPeriodPreset): void {
+    this.stopAnimation();
     this.preset.set(preset);
     this.appliedPeriod = fleetPeriod(preset);
+    this.periodChanged = true;
     this.page.set(0);
     this.load();
   }
@@ -253,7 +337,25 @@ export class DashboardPage {
       .fleet(this.appliedPeriod)
       .pipe(finalize(() => this.loading.set(false)))
       .subscribe({
-        next: (data) => this.fleet.set(data),
+        next: (data) => {
+          const animatePeriod = !this.firstLoad && this.periodChanged && !this.reducedMotion();
+          this.animateUtilization.set(animatePeriod);
+          this.fleet.set(data);
+          if (this.firstLoad && !this.reducedMotion()) {
+            this.animateCharts.set(true);
+            this.animateCounts();
+          } else {
+            this.displayedCounts.set(this.kpis().map((item) => item.value));
+          }
+          if ((this.firstLoad && !this.reducedMotion()) || animatePeriod) {
+            this.animationTimer = this.document.defaultView?.setTimeout(() => {
+              this.animateCharts.set(false);
+              this.animateUtilization.set(false);
+            }, LOAD_ANIMATION_MS + 100);
+          }
+          this.firstLoad = false;
+          this.periodChanged = false;
+        },
         error: () => this.failed.set(true),
       });
   }

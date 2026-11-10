@@ -51,6 +51,7 @@ test('selects preset periods ending today, including month-end and leap-year dat
   });
   await page.goto('/dashboard');
   await expect(page.getByTestId('kpi-total')).toContainText('1');
+  let count = 1;
   for (const [label, expected] of [
     ['Last 3 months', '2024-03-01/2024-05-31'],
     ['Last 6 months', '2023-12-01/2024-05-31'],
@@ -59,7 +60,8 @@ test('selects preset periods ending today, including month-end and leap-year dat
   ]) {
     await page.getByRole('radio', { name: label }).click();
     await expect(page.getByRole('radio', { name: label })).toBeChecked();
-    await expect(page.getByTestId('kpi-total')).toContainText(String(requests.length));
+    count++;
+    await expect(page.getByTestId('kpi-total').locator('.text-display')).toHaveText(String(count));
     expect(requests.at(-1)).toBe(expected);
   }
 });
@@ -89,6 +91,93 @@ test('shows chart data and updates utilization for the selected period', async (
       return pixels.some((value, index) => index % 4 === 3 && value > 0);
     })).toBe(true);
   }
+});
+
+test('animates the first load and only the utilization chart on period changes', async ({ page }) => {
+  await page.addInitScript(() => {
+    const tracked = window as typeof window & { kpiFrames: string[]; chartFrames: string[] };
+    tracked.kpiFrames = [];
+    tracked.chartFrames = [];
+    new MutationObserver(() => {
+      const value = document.querySelector('[data-testid="kpi-total"] .text-display')?.textContent;
+      if (value && tracked.kpiFrames.at(-1) !== value) tracked.kpiFrames.push(value);
+    }).observe(document, { childList: true, characterData: true, subtree: true });
+    const original = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (text, x, y, maxWidth) {
+      if (this.canvas.closest('.utilization-chart') && this.textAlign === 'right' && this.textBaseline === 'middle' && Math.abs(x - (this.canvas.clientWidth - 4)) < 1) {
+        tracked.chartFrames.push(text);
+      }
+      if (maxWidth === undefined) original.call(this, text, x, y);
+      else original.call(this, text, x, y, maxWidth);
+    };
+  });
+  let requests = 0;
+  await page.route('**/api/v1/dashboard/fleet?*', async (route) => {
+    requests++;
+    const utilization = [{ ...fleet.utilization[0], utilization_percent: requests === 1 ? 50 : 75 }];
+    await route.fulfill({ json: { ...fleet, total_equipment: requests === 1 ? 1000 : 2000, utilization } });
+  });
+  await page.goto('/dashboard');
+  await expect(page.getByTestId('kpi-total').locator('.text-display')).toHaveText('1000');
+  await expect.poll(() => page.evaluate(() => (window as typeof window & { chartFrames: string[] }).chartFrames.includes('50%'))).toBe(true);
+  const initial = await page.evaluate(() => {
+    const tracked = window as typeof window & { kpiFrames: string[]; chartFrames: string[] };
+    return { counts: tracked.kpiFrames, chart: tracked.chartFrames };
+  });
+  expect(initial.counts.some((value) => Number(value) > 0 && Number(value) < 1000)).toBe(true);
+  expect(initial.chart.some((value) => parseFloat(value) > 0 && parseFloat(value) < 50)).toBe(true);
+  await page.evaluate(() => {
+    const tracked = window as typeof window & { kpiFrames: string[]; chartFrames: string[] };
+    tracked.kpiFrames = [];
+    tracked.chartFrames = [];
+  });
+  const originalCanvas = await page.locator('.utilization-chart canvas').elementHandle();
+  await page.getByRole('radio', { name: 'Last 3 months' }).click();
+  await expect(page.getByTestId('kpi-total').locator('.text-display')).toHaveText('2000');
+  await expect.poll(() => page.evaluate(() => (window as typeof window & { chartFrames: string[] }).chartFrames.includes('75%'))).toBe(true);
+  await page.waitForTimeout(750);
+  const updated = await page.evaluate(() => {
+    const tracked = window as typeof window & { kpiFrames: string[]; chartFrames: string[] };
+    return { counts: tracked.kpiFrames, chart: tracked.chartFrames };
+  });
+  expect(updated.counts).toContain('2000');
+  expect(updated.counts.every((value) => value === '1000' || value === '2000')).toBe(true);
+  expect(updated.chart.some((value) => parseFloat(value) > 50 && parseFloat(value) < 75)).toBe(true);
+  expect(await page.locator('.utilization-chart canvas').evaluate((element, previous) => element === previous, originalCanvas)).toBe(true);
+});
+
+test('shows final values immediately with reduced motion', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.addInitScript(() => {
+    const tracked = window as typeof window & { reducedCounts: string[]; reducedChart: string[] };
+    tracked.reducedCounts = [];
+    tracked.reducedChart = [];
+    new MutationObserver(() => {
+      const value = document.querySelector('[data-testid="kpi-total"] .text-display')?.textContent;
+      if (value) tracked.reducedCounts.push(value);
+    }).observe(document, { childList: true, characterData: true, subtree: true });
+    const original = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (text, x, y, maxWidth) {
+      if (this.canvas.closest('.utilization-chart') && this.textAlign === 'right' && this.textBaseline === 'middle' && Math.abs(x - (this.canvas.clientWidth - 4)) < 1) {
+        tracked.reducedChart.push(text);
+      }
+      if (maxWidth === undefined) original.call(this, text, x, y);
+      else original.call(this, text, x, y, maxWidth);
+    };
+  });
+  await page.route('**/api/v1/dashboard/fleet?*', (route) =>
+    route.fulfill({ json: { ...fleet, total_equipment: 1000 } }),
+  );
+  await page.goto('/dashboard');
+  await expect(page.getByTestId('kpi-total').locator('.text-display')).toHaveText('1000');
+  await expect(page.getByTestId('kpi-total').locator('.visually-hidden')).toHaveText('1000');
+  await expect.poll(() => page.evaluate(() => (window as typeof window & { reducedChart: string[] }).reducedChart.includes('50%'))).toBe(true);
+  const frames = await page.evaluate(() => {
+    const tracked = window as typeof window & { reducedCounts: string[]; reducedChart: string[] };
+    return { reducedCounts: tracked.reducedCounts, reducedChart: tracked.reducedChart };
+  });
+  expect(frames.reducedCounts.every((value) => value === '1000')).toBe(true);
+  expect(frames.reducedChart.every((value) => value === '50%' || value === '0%')).toBe(true);
 });
 
 test('pages through utilization without dropping equipment', async ({ page }) => {
@@ -132,7 +221,29 @@ test('retries the applied period after a failed request', async ({ page }) => {
   await expect(page.getByText('Fleet availability could not be loaded.')).toBeVisible();
   await page.getByRole('button', { name: 'Retry' }).click();
   await expect(page.getByTestId('kpi-total')).toBeVisible();
+  await expect.poll(() => requests.length).toBe(3);
   expect(requests.slice(1)).toEqual(['2026-08-11/2026-11-10', '2026-08-11/2026-11-10']);
+});
+
+test('keeps the dashboard visible while the period updates', async ({ page }) => {
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => (release = resolve));
+  let requests = 0;
+  await page.route('**/api/v1/dashboard/fleet?*', async (route) => {
+    requests++;
+    if (requests === 2) await pending;
+    await route.fulfill({ json: fleet });
+  });
+  await page.goto('/dashboard');
+  await expect(page.getByTestId('fleet-kpis')).toBeVisible();
+  const chart = await page.locator('.utilization-chart canvas').elementHandle();
+  await page.getByRole('radio', { name: 'Last 3 months' }).click();
+  await expect(page.getByRole('progressbar', { name: 'Updating utilization' })).toBeVisible();
+  await expect(page.getByTestId('fleet-kpis')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Status distribution' })).toBeVisible();
+  expect(await page.locator('.utilization-chart canvas').evaluate((element, previous) => element === previous, chart)).toBe(true);
+  release();
+  await expect(page.getByRole('progressbar', { name: 'Updating utilization' })).toHaveCount(0);
 });
 
 test('shows zero counts and an empty state for an empty fleet', async ({ page }) => {
