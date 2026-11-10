@@ -1,0 +1,120 @@
+<app-page-header title="Site costs" subtitle="Operating costs compared with construction budgets">
+  <a mat-stroked-button routerLink="/dashboard">Back to dashboard</a>
+</app-page-header>
+<section class="filters-bar">
+  <mat-form-field appearance="outline"
+    ><mat-label>Site</mat-label>
+    <mat-select
+      data-testid="site-filter"
+      [canSelectNullableOptions]="true"
+      [ngModel]="site()"
+      (ngModelChange)="site.set($event); selectedId.set(null); pageIndex.set(0)"
+    >
+      <mat-option [value]="null">All sites</mat-option>
+      @for (s of items(); track s.site_id) {
+        <mat-option [value]="s.site_id">{{ s.site_name }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+  <button mat-stroked-button (click)="load()" [disabled]="loading()">Refresh</button>
+</section>
+<section class="card" [attr.aria-busy]="loading()">
+  @if (loading()) {
+    <mat-progress-bar data-testid="page-loading" mode="indeterminate" />
+  }
+  @if (failed()) {
+    <div class="empty-state">
+      <p>Site costs could not be loaded.</p>
+      <button mat-stroked-button (click)="load()">Retry</button>
+    </div>
+  } @else if (!loading() && filtered().length === 0) {
+    <div class="empty-state">
+      <span class="material-symbols-rounded" aria-hidden="true">payments</span>
+      <p>No site costs to display.</p>
+    </div>
+  } @else if (!loading()) {
+    <div class="table-scroll">
+      <table mat-table [dataSource]="visible()">
+        <ng-container matColumnDef="site"
+          ><th mat-header-cell *matHeaderCellDef class="text-caption">Site</th>
+          <td mat-cell *matCellDef="let s">{{ s.site_name }}</td></ng-container
+        >
+        <ng-container matColumnDef="budget"
+          ><th mat-header-cell *matHeaderCellDef class="num text-caption">Budget</th>
+          <td mat-cell *matCellDef="let s" class="num">{{ money(s.budget) }}</td></ng-container
+        >
+        <ng-container matColumnDef="spent"
+          ><th mat-header-cell *matHeaderCellDef class="num text-caption">Spent</th>
+          <td mat-cell *matCellDef="let s" class="num">{{ money(s.spent) }}</td></ng-container
+        >
+        <ng-container matColumnDef="remaining"
+          ><th mat-header-cell *matHeaderCellDef class="num text-caption">Remaining</th>
+          <td mat-cell *matCellDef="let s" class="num">{{ money(s.remaining) }}</td></ng-container
+        >
+        <ng-container matColumnDef="used"
+          ><th mat-header-cell *matHeaderCellDef class="text-caption">Budget used</th>
+          <td mat-cell *matCellDef="let s">
+            @if (s.over_budget) {
+              <strong class="over-budget">Over budget · </strong>
+            }
+            {{ s.percent_used }}%
+            @if (s.budget === 0) {
+              <span class="text-caption"> (no budget allocated)</span>
+            }
+          </td></ng-container
+        >
+        <ng-container matColumnDef="actions"
+          ><th mat-header-cell *matHeaderCellDef class="text-caption">Breakdown</th>
+          <td mat-cell *matCellDef="let s">
+            <button
+              mat-icon-button
+              matTooltip="View cost breakdown"
+              data-testid="view-costs"
+              (click)="selectedId.set(s.site_id)"
+              [attr.aria-label]="'View costs for ' + s.site_name"
+            >
+              <span class="material-symbols-rounded" aria-hidden="true">receipt_long</span>
+            </button>
+          </td></ng-container
+        >
+        <tr mat-header-row *matHeaderRowDef="columns"></tr>
+        <tr mat-row *matRowDef="let row; columns: columns" [class.over]="row.over_budget"></tr>
+      </table>
+    </div>
+    @if (filtered().length > 20) {
+      <mat-paginator
+        [length]="filtered().length"
+        [pageIndex]="pageIndex()"
+        [pageSize]="pageSize()"
+        [pageSizeOptions]="[20, 50]"
+        (page)="pageIndex.set($event.pageIndex); pageSize.set($event.pageSize)"
+      />
+    }
+    <p class="text-caption">
+      Equipment cost uses approved reservation days × 8 hours × hourly rate. Maintenance includes
+      attributed labour and parts.
+    </p>
+  }
+</section>
+@if (!loading() && !failed()) {
+  @if (selected(); as s) {
+    <section class="card" aria-live="polite" data-testid="cost-breakdown">
+      <h2>{{ s.site_name }} cost breakdown</h2>
+      <dl>
+        <div>
+          <dt>Equipment</dt>
+          <dd class="num">{{ money(s.equipment_cost) }}</dd>
+        </div>
+        <div>
+          <dt>Maintenance (labour and parts)</dt>
+          <dd class="num">{{ money(s.maintenance_cost) }}</dd>
+        </div>
+        <div>
+          <dt>Total spent</dt>
+          <dd class="num">{{ money(s.spent) }}</dd>
+        </div>
+      </dl>
+      <button mat-button (click)="selectedId.set(null)">Close breakdown</button>
+    </section>
+  }
+}

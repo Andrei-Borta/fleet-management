@@ -1,3 +1,4 @@
+import { RouterLink } from '@angular/router';
 import { Component } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 
@@ -7,10 +8,10 @@ import { Status, StatusBadge } from '../../shared/status-badge/status-badge';
 /** Placeholder: shows the style guide building blocks until the dashboard issue is done. */
 @Component({
   selector: 'app-dashboard-page',
-  imports: [PageHeader, StatusBadge, MatButtonModule],
+  imports: [PageHeader, StatusBadge, MatButtonModule, RouterLink],
   template: `
     <app-page-header title="Dashboard" subtitle="Fleet overview">
-      <button mat-stroked-button>Export</button>
+      <a mat-stroked-button routerLink="/dashboard/costs">Site costs</a>
       <button mat-flat-button>New reservation</button>
     </app-page-header>
 
