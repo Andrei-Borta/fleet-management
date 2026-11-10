@@ -3,9 +3,12 @@
 from datetime import date
 from decimal import Decimal
 
+from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.db import get_db
+from app.main import app
 from app.modules.equipment.models import Equipment, EquipmentStatus
 from app.modules.maintenance.models import (
     InterventionPart,
@@ -71,6 +74,26 @@ def test_seed_builds_the_demo_scenarios(db: Session) -> None:
         InterventionStatus.DONE,
     }
     assert any(part.unit_cost == Decimal("450.00") for part in db.scalars(select(InterventionPart)))
+
+
+def test_seed_costs_show_over_budget_and_near_budget(db: Session) -> None:
+    seed(db, reset=True)
+    app.dependency_overrides[get_db] = lambda: db
+    try:
+        with TestClient(app) as client:
+            response = client.get("/api/v1/dashboard/costs")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 200
+    sites = {site["site_name"]: site for site in response.json()["sites"]}
+    over = sites["Pipera Business Park"]
+    near = sites["Dambovita Bridge"]
+    assert over["over_budget"] is True
+    assert over["spent"] > over["budget"]
+    assert over["remaining"] < 0
+    assert near["over_budget"] is False
+    assert 85 <= near["percent_used"] < 100
 
 
 def test_seed_reset_removes_existing_fleet_data(db: Session) -> None:
