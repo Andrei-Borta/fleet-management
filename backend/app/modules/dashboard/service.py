@@ -22,6 +22,7 @@ from app.modules.dashboard.schemas import (
 from app.modules.equipment.models import Equipment, EquipmentStatus
 from app.modules.maintenance.models import InterventionPart, ServiceIntervention
 from app.modules.reservations.models import Reservation, ReservationStatus
+from app.modules.reservations.service import BLOCKED_STATUSES
 from app.modules.sites.models import Site
 
 HOURS_PER_RESERVATION_DAY = Decimal("8.00")
@@ -36,6 +37,34 @@ def _validate_period(start: date, end: date) -> None:
 
 def _inclusive_days(start: date, end: date) -> int:
     return (end - start).days + 1
+
+
+def _status_reference_date(start: date, end: date) -> date:
+    """The day whose bookings decide the snapshot shown in ``by_status``."""
+    today = date.today()
+    return today if start <= today <= end else end
+
+
+def _reserved_equipment_ids(db: Session, reference: date) -> set[int]:
+    """Equipment with an approved reservation covering the reference day."""
+    return set(
+        db.scalars(
+            select(Reservation.equipment_id).where(
+                Reservation.status == ReservationStatus.APPROVED,
+                Reservation.start_date <= reference,
+                Reservation.end_date >= reference,
+            )
+        ).all()
+    )
+
+
+def _effective_status(equipment: Equipment, reserved_ids: set[int]) -> EquipmentStatus:
+    """Stored status, except that booked equipment is reported as reserved."""
+    if equipment.status in BLOCKED_STATUSES:
+        return equipment.status
+    if equipment.id in reserved_ids:
+        return EquipmentStatus.RESERVED
+    return equipment.status
 
 
 def _merged_days(intervals: list[tuple[date, date]]) -> int:
@@ -88,14 +117,18 @@ def _utilization(
 def fleet_stats(db: Session, start: date, end: date) -> FleetStats:
     """Counts per status/type plus utilization and rankings for an inclusive period.
 
-    Utilization and rankings cover the active fleet (retired equipment is left out); the
-    status and type counts still include every equipment record.
+    Availability is a snapshot at today when it falls inside the period, otherwise at the
+    period end. Equipment with an approved reservation on that day counts as reserved unless
+    it is defective, in service or retired. Utilization and rankings cover the active fleet
+    (retired equipment is left out); the status and type counts include every record.
     """
     _validate_period(start, end)
     period_days = _inclusive_days(start, end)
     equipment = list(db.scalars(select(Equipment).order_by(Equipment.id)).all())
 
-    status_counts = Counter(item.status for item in equipment)
+    reference = _status_reference_date(start, end)
+    reserved_ids = _reserved_equipment_ids(db, reference)
+    status_counts = Counter(_effective_status(item, reserved_ids) for item in equipment)
     by_status = [
         StatusCount(status=status, count=status_counts.get(status, 0)) for status in EquipmentStatus
     ]

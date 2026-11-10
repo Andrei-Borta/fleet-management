@@ -80,7 +80,9 @@ def test_fleet_endpoint_returns_counts_and_utilization(
     assert body["end_date"] == "2099-05-12"
     assert body["period_days"] == 3
     assert body["total_equipment"] == 1
-    assert {row["status"]: row["count"] for row in body["by_status"]}["available"] == 1
+    counts = {row["status"]: row["count"] for row in body["by_status"]}
+    assert counts["reserved"] == 1
+    assert counts["available"] == 0
     assert body["by_type"] == [{"type": "crane", "count": 1}]
     assert body["utilization"] == [
         {

@@ -1,6 +1,6 @@
 """Service coverage for dashboard availability, utilization and cost aggregates."""
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
@@ -158,6 +158,69 @@ def test_counts_group_by_status_and_type(db: Session) -> None:
         ("crane", 1),
         ("loader", 1),
     ]
+
+
+def test_by_status_counts_a_machine_booked_for_the_period_as_reserved(db: Session) -> None:
+    equipment = make_equipment(db)
+    site = make_site(db)
+    reserve(db, equipment, site, D, D)
+
+    stats = service.fleet_stats(db, D, D)
+
+    counts = {item.status: item.count for item in stats.by_status}
+    assert counts[EquipmentStatus.RESERVED] == 1
+    assert counts[EquipmentStatus.AVAILABLE] == 0
+
+
+def test_by_status_uses_today_when_it_falls_inside_the_period(db: Session) -> None:
+    today = date.today()
+    equipment = make_equipment(db)
+    site = Site(
+        name="Today site",
+        address="Main Street",
+        budget=Decimal("10000.00"),
+        start_date=today - timedelta(days=10),
+        end_date=today + timedelta(days=10),
+    )
+    db.add(site)
+    db.flush()
+    # Ends today, so it does not cover the end of the selected period.
+    reserve(db, equipment, site, today - timedelta(days=1), today)
+
+    stats = service.fleet_stats(db, today, today + timedelta(days=5))
+
+    counts = {item.status: item.count for item in stats.by_status}
+    assert counts[EquipmentStatus.RESERVED] == 1
+    assert counts[EquipmentStatus.AVAILABLE] == 0
+
+
+@pytest.mark.parametrize(
+    "status", [EquipmentStatus.DEFECTIVE, EquipmentStatus.IN_SERVICE, EquipmentStatus.RETIRED]
+)
+def test_blocked_statuses_are_not_reported_as_reserved(
+    db: Session, status: EquipmentStatus
+) -> None:
+    equipment = make_equipment(db, status=status)
+    site = make_site(db)
+    reserve(db, equipment, site, D, D)
+
+    stats = service.fleet_stats(db, D, D)
+
+    counts = {item.status: item.count for item in stats.by_status}
+    assert counts[status] == 1
+    assert counts[EquipmentStatus.RESERVED] == 0
+
+
+def test_pending_reservation_does_not_make_equipment_reserved(db: Session) -> None:
+    equipment = make_equipment(db)
+    site = make_site(db)
+    reserve(db, equipment, site, D, D, ReservationStatus.PENDING)
+
+    stats = service.fleet_stats(db, D, D)
+
+    counts = {item.status: item.count for item in stats.by_status}
+    assert counts[EquipmentStatus.AVAILABLE] == 1
+    assert counts[EquipmentStatus.RESERVED] == 0
 
 
 def test_utilization_counts_only_approved_days_inside_the_period(db: Session) -> None:
