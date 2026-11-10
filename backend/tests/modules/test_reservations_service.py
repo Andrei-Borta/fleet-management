@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime
 from uuid import uuid4
 
 import pytest
@@ -596,3 +596,32 @@ def test_ensure_reservable_offers_alternatives_for_a_blocked_machine(db):
 
 def test_reservation_conflict_error_defaults_to_no_alternatives():
     assert ReservationConflictError("Busy", []).alternatives == []
+
+
+def test_ensure_reservable_rejects_overdue_equipment(db: Session) -> None:
+    type_ = f"type-{uuid4().hex}"
+    equipment = make_equipment(
+        db,
+        type_=type_,
+        status=EquipmentStatus.AVAILABLE,
+    )
+    equipment.service_interval_days = 1
+    equipment.last_service_at = datetime(2020, 1, 1, tzinfo=UTC)
+    db.flush()
+
+    free_alternative = make_equipment(db, type_=type_)
+
+    with pytest.raises(ReservationConflictError, match="overdue for service") as error:
+        ensure_reservable(db, equipment.id, BOOKED_START, BOOKED_END)
+
+    assert [a.id for a in error.value.alternatives] == [free_alternative.id]
+
+
+def test_find_alternatives_excludes_overdue_equipment(db: Session) -> None:
+    requested = make_equipment(db, type_="crane-overdue")
+    overdue = make_equipment(db, type_="crane-overdue")
+    overdue.service_interval_days = 1
+    overdue.last_service_at = datetime(2020, 1, 1, tzinfo=UTC)
+    db.flush()
+
+    assert find_alternatives(db, requested.id, BOOKED_START, BOOKED_END) == []
