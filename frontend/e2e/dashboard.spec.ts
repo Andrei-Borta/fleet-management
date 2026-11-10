@@ -21,11 +21,11 @@ const fleet = {
   least_used: [],
 };
 
-test('shows fleet availability for the last 30 days', async ({ page }) => {
+test('shows fleet availability for the last month', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-11-10T12:00:00'));
   await page.route('**/api/v1/dashboard/fleet?*', async (route) => {
     const url = new URL(route.request().url());
-    expect(url.searchParams.get('from')).toBe('2026-10-12');
+    expect(url.searchParams.get('from')).toBe('2026-10-11');
     expect(url.searchParams.get('to')).toBe('2026-11-10');
     await route.fulfill({ json: fleet });
   });
@@ -38,7 +38,7 @@ test('shows fleet availability for the last 30 days', async ({ page }) => {
   await expect(page.getByTestId('kpi-available').locator('.material-symbols-rounded')).toHaveText('check_circle');
   await expect(page.getByTestId('kpi-reserved').locator('.material-symbols-rounded')).toHaveText('event_available');
   await expect(page.getByTestId('kpi-service-defective').locator('.material-symbols-rounded')).toHaveText('build');
-  await expect(page.getByRole('radio', { name: '30 days' })).toBeChecked();
+  await expect(page.getByRole('radio', { name: 'Last 1 month' })).toBeChecked();
 });
 
 test('selects preset periods ending today, including month-end and leap-year dates', async ({ page }) => {
@@ -52,10 +52,10 @@ test('selects preset periods ending today, including month-end and leap-year dat
   await page.goto('/dashboard');
   await expect(page.getByTestId('kpi-total')).toContainText('1');
   for (const [label, expected] of [
-    ['3 months', '2024-03-01/2024-05-31'],
-    ['6 months', '2023-12-01/2024-05-31'],
-    ['1 year', '2023-06-01/2024-05-31'],
-    ['30 days', '2024-05-02/2024-05-31'],
+    ['Last 3 months', '2024-03-01/2024-05-31'],
+    ['Last 6 months', '2023-12-01/2024-05-31'],
+    ['Last 1 year', '2023-06-01/2024-05-31'],
+    ['Last 1 month', '2024-05-01/2024-05-31'],
   ]) {
     await page.getByRole('radio', { name: label }).click();
     await expect(page.getByRole('radio', { name: label })).toBeChecked();
@@ -77,7 +77,7 @@ test('shows chart data and updates utilization for the selected period', async (
   const utilization = page.getByRole('list', { name: 'Equipment utilization' });
   await expect(utilization.getByRole('listitem').filter({ hasText: 'Excavator' })).toContainText('50%');
   await expect(utilization.getByRole('listitem').filter({ hasText: 'Loader' })).toContainText('0%');
-  await page.getByRole('radio', { name: '3 months' }).click();
+  await page.getByRole('radio', { name: 'Last 3 months' }).click();
   await expect(utilization.getByRole('listitem')).toHaveCount(1);
   await expect(utilization.getByRole('listitem').first()).toContainText('75%');
   await expect(page.locator('canvas')).toHaveCount(2);
@@ -92,17 +92,24 @@ test('shows chart data and updates utilization for the selected period', async (
 });
 
 test('pages through utilization without dropping equipment', async ({ page }) => {
-  const utilization = Array.from({ length: 9 }, (_, i) => ({ ...fleet.utilization[0], equipment_id: i + 1, name: `Machine ${i + 1}` }));
+  const utilization = Array.from({ length: 9 }, (_, i) => ({ ...fleet.utilization[0], equipment_id: i + 1, name: `Machine ${i + 1}`, utilization_percent: 99.99 }));
   await page.route('**/api/v1/dashboard/fleet?*', (route) => route.fulfill({ json: { ...fleet, utilization } }));
   await page.goto('/dashboard');
   const list = page.getByRole('list', { name: 'Equipment utilization' });
   await expect(list.getByRole('listitem')).toHaveCount(8);
-  await page.getByRole('button', { name: 'Next equipment' }).click();
+  await expect(list.getByRole('listitem').first()).toContainText('99.99%');
+  const next = page.getByRole('button', { name: 'Next' });
+  const nextText = await next.locator('.pagination-label').boundingBox();
+  const nextIcon = await next.locator('.material-symbols-rounded').boundingBox();
+  expect(nextText).not.toBeNull();
+  expect(nextIcon).not.toBeNull();
+  expect(Math.abs(nextText!.y + nextText!.height / 2 - (nextIcon!.y + nextIcon!.height / 2))).toBeLessThan(2);
+  await page.getByRole('button', { name: 'Next' }).click();
   await expect(list.getByRole('listitem')).toHaveCount(1);
   await expect(list.getByRole('listitem').first()).toContainText('Machine 9');
-  await expect(list.getByRole('listitem').first()).toContainText('50%');
-  await page.getByRole('button', { name: 'Previous equipment' }).click();
-  await expect(list.getByText('Machine 1', { exact: true })).toBeVisible();
+  await expect(list.getByRole('listitem').first()).toContainText('99.99%');
+  await page.getByRole('button', { name: 'Previous' }).click();
+  await expect(list.getByText('Machine 1', { exact: true })).toHaveCount(1);
 });
 
 test('retries the applied period after a failed request', async ({ page }) => {
@@ -121,7 +128,7 @@ test('retries the applied period after a failed request', async ({ page }) => {
   });
   await page.goto('/dashboard');
   await expect(page.getByTestId('kpi-total')).toBeVisible();
-  await page.getByRole('radio', { name: '3 months' }).click();
+  await page.getByRole('radio', { name: 'Last 3 months' }).click();
   await expect(page.getByText('Fleet availability could not be loaded.')).toBeVisible();
   await page.getByRole('button', { name: 'Retry' }).click();
   await expect(page.getByTestId('kpi-total')).toBeVisible();
@@ -167,13 +174,19 @@ for (const width of [375, 1440]) {
     await page.route('**/api/v1/dashboard/fleet?*', (route) => route.fulfill({ json: fleet }));
     await page.goto('/dashboard');
     await expect(page.getByTestId('fleet-kpis')).toBeVisible();
-    const title = await page.getByTestId('page-title').boundingBox();
+    const title = await page.getByRole('heading', { name: 'Utilization per equipment' }).boundingBox();
     const toggle = await page.getByRole('radiogroup', { name: 'Utilization period' }).boundingBox();
     expect(title).not.toBeNull();
     expect(toggle).not.toBeNull();
     if (width === 1440) {
+      const statusCard = await page.getByRole('region', { name: 'Status distribution' }).boundingBox();
+      const utilizationCard = await page.getByRole('region', { name: 'Utilization per equipment' }).boundingBox();
+      expect(statusCard).not.toBeNull();
+      expect(utilizationCard).not.toBeNull();
+      expect(Math.abs(statusCard!.y - utilizationCard!.y)).toBeLessThan(2);
+      expect(Math.abs(statusCard!.height - utilizationCard!.height)).toBeLessThan(2);
       expect(toggle!.x).toBeGreaterThan(title!.x + title!.width);
-      expect(Math.abs(toggle!.y - title!.y)).toBeLessThan(5);
+      expect(Math.abs(toggle!.y + toggle!.height / 2 - (title!.y + title!.height / 2))).toBeLessThan(3);
     }
     for (const theme of ['light', 'dark']) {
       if (theme === 'dark') await page.getByTestId('theme-toggle').click();

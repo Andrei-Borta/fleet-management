@@ -12,6 +12,7 @@ import {
   ChartOptions,
   DoughnutController,
   LinearScale,
+  Plugin,
   Tooltip,
 } from 'chart.js';
 import { BaseChartDirective, provideCharts } from 'ng2-charts';
@@ -34,16 +35,7 @@ import { DashboardService, fleetPeriod, FleetPeriodPreset } from './dashboard.se
     registerables: [ArcElement, BarController, BarElement, CategoryScale, DoughnutController, LinearScale, Tooltip],
   })],
   template: `
-    <app-page-header title="Dashboard" subtitle="Fleet overview">
-      <mat-button-toggle-group class="period-toggle" aria-label="Utilization period"
-        [value]="preset()" [disabled]="loading()" (change)="selectPeriod($event.value)"
-        hideSingleSelectionIndicator>
-        <mat-button-toggle value="30d">30 days</mat-button-toggle>
-        <mat-button-toggle value="3m">3 months</mat-button-toggle>
-        <mat-button-toggle value="6m">6 months</mat-button-toggle>
-        <mat-button-toggle value="1y">1 year</mat-button-toggle>
-      </mat-button-toggle-group>
-    </app-page-header>
+    <app-page-header title="Dashboard" subtitle="Fleet overview" />
     <section aria-label="Fleet overview" [attr.aria-busy]="loading()">
       @if (loading()) {
         <div class="card"><mat-progress-bar data-testid="fleet-loading" mode="indeterminate" /></div>
@@ -82,21 +74,31 @@ import { DashboardService, fleetPeriod, FleetPeriodPreset } from './dashboard.se
             }
           </section>
           <section class="card" aria-labelledby="utilization-heading">
-            <h2 id="utilization-heading">Utilization per equipment</h2>
+            <div class="chart-header">
+              <h2 id="utilization-heading">Utilization per equipment</h2>
+              <mat-button-toggle-group class="period-toggle" aria-label="Utilization period"
+                [value]="preset()" [disabled]="loading()" (change)="selectPeriod($event.value)"
+                hideSingleSelectionIndicator>
+                <mat-button-toggle value="1m" aria-label="Last 1 month">1M</mat-button-toggle>
+                <mat-button-toggle value="3m" aria-label="Last 3 months">3M</mat-button-toggle>
+                <mat-button-toggle value="6m" aria-label="Last 6 months">6M</mat-button-toggle>
+                <mat-button-toggle value="1y" aria-label="Last 1 year">1Y</mat-button-toggle>
+              </mat-button-toggle-group>
+            </div>
             @if (data.utilization.length === 0) {
               <div class="empty-state"><p>No active equipment to display.</p></div>
             } @else {
-              <div class="utilization-chart"><canvas baseChart [type]="'bar'" [data]="utilizationChart()" [options]="utilizationOptions()" aria-hidden="true"></canvas></div>
-              <ul class="utilization-list" aria-label="Equipment utilization">
+              <div class="utilization-chart"><canvas baseChart [type]="'bar'" [data]="utilizationChart()" [options]="utilizationOptions()" [plugins]="utilizationLabels" aria-hidden="true"></canvas></div>
+              <ul class="visually-hidden" aria-label="Equipment utilization">
                 @for (item of visibleUtilization(); track item.equipment_id) {
                   <li><span>{{ item.name }}</span> <span class="num">{{ item.utilization_percent }}%</span></li>
                 }
               </ul>
               @if (data.utilization.length > pageSize) {
                 <div class="chart-pagination">
-                  <button mat-stroked-button (click)="page.set(page() - 1)" [disabled]="page() === 0">Previous equipment</button>
-                  <span class="text-caption">{{ page() + 1 }} / {{ pageCount() }}</span>
-                  <button mat-stroked-button (click)="page.set(page() + 1)" [disabled]="page() + 1 >= pageCount()">Next equipment</button>
+                  <button mat-stroked-button (click)="page.set(page() - 1)" [disabled]="page() === 0"><span class="pagination-label"><span class="material-symbols-rounded" aria-hidden="true">arrow_back</span> Previous</span></button>
+                  <span class="text-muted num">{{ page() + 1 }} / {{ pageCount() }}</span>
+                  <button mat-stroked-button (click)="page.set(page() + 1)" [disabled]="page() + 1 >= pageCount()"><span class="pagination-label">Next <span class="material-symbols-rounded" aria-hidden="true">arrow_forward</span></span></button>
                 </div>
               }
             }
@@ -106,17 +108,23 @@ import { DashboardService, fleetPeriod, FleetPeriodPreset } from './dashboard.se
     </section>
   `,
   styles: `
-    app-page-header { align-items: flex-start; }
+    .chart-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-4); }
+    .chart-header h2 { margin: 0; }
     .period-toggle { --mat-button-toggle-height: var(--space-6); }
     .kpi { flex-direction: row; align-items: center; gap: var(--space-4); }
     .kpi-icon { font-size: var(--space-7); color: var(--color-text-muted); }
     .kpi-details { display: flex; flex-direction: column; gap: var(--space-1); }
-    .charts { margin-top: var(--space-5); align-items: start; }
+    .charts { margin-top: var(--space-5); }
+    .charts > .card + .card { margin-top: 0; }
     .status-chart { height: calc(var(--space-8) * 5); }
     .utilization-chart { height: calc(var(--space-8) * 7); }
-    .status-list, .utilization-list { list-style: none; margin: var(--space-4) 0 0; padding: 0; }
-    .status-list li, .utilization-list li { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); margin-top: var(--space-2); }
+    .status-list { list-style: none; margin: var(--space-4) 0 0; padding: 0; }
+    .status-list li { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); margin-top: var(--space-2); }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
     .chart-pagination { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-2); margin-top: var(--space-4); }
+    .chart-pagination button { --mat-button-outlined-container-height: var(--space-6); --mat-button-outlined-horizontal-padding: var(--space-3); }
+    .pagination-label { display: inline-flex; align-items: center; gap: var(--space-1); }
+    .pagination-label .material-symbols-rounded { font-size: var(--space-4); }
   `,
 })
 export class DashboardPage {
@@ -128,8 +136,8 @@ export class DashboardPage {
   ];
   protected readonly pageSize = 8;
   protected readonly page = signal(0);
-  protected readonly preset = signal<FleetPeriodPreset>('30d');
-  private appliedPeriod: FleetPeriod = fleetPeriod('30d');
+  protected readonly preset = signal<FleetPeriodPreset>('1m');
+  private appliedPeriod: FleetPeriod = fleetPeriod('1m');
   protected readonly fleet = signal<FleetStats | null>(null);
   protected readonly loading = signal(false);
   protected readonly failed = signal(false);
@@ -164,10 +172,36 @@ export class DashboardPage {
   protected readonly statusOptions: ChartOptions<'doughnut'> = {
     responsive: true, maintainAspectRatio: false, animation: false,
   };
+  protected readonly utilizationLabels: Plugin<'bar'>[] = [{
+    id: 'utilizationLabels',
+    afterDatasetsDraw: (chart) => {
+      const { ctx } = chart;
+      ctx.save();
+      ctx.fillStyle = this.colors(['--color-text'])[0];
+      ctx.font = this.document.defaultView?.getComputedStyle(chart.canvas).font || ctx.font;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      chart.getDatasetMeta(0).data.forEach((bar, index) => {
+        ctx.fillText(`${chart.data.datasets[0].data[index]}%`, chart.width - 4, bar.y);
+      });
+      ctx.restore();
+    },
+  }];
   protected readonly utilizationOptions = computed<ChartOptions<'bar'>>(() => {
     const [text, grid] = this.colors(['--color-text', '--color-border']);
+    const styles = this.document.defaultView?.getComputedStyle(this.document.body);
+    const context = this.document.createElement('canvas').getContext('2d');
+    if (context && styles) context.font = styles.font;
+    const widestLabel = Math.max(
+      0,
+      ...this.visibleUtilization().map((item) =>
+        context?.measureText(`${item.utilization_percent}%`).width ?? 0,
+      ),
+    );
+    const gap = Number.parseFloat(this.colors(['--space-4'])[0]) || 16;
     return {
       indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: false,
+      layout: { padding: { right: Math.ceil(widestLabel) + gap + 4 } },
       scales: {
         x: { min: 0, max: 100, ticks: { color: text, callback: (value) => `${value}%` }, grid: { color: grid } },
         y: { ticks: { color: text }, grid: { display: false } },

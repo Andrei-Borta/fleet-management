@@ -4,14 +4,13 @@ import { API_URL } from '../../core/api';
 import { addCalendarMonths, toLocalIsoDate } from '../../shared/date-utils';
 import { FleetPeriod, FleetStats } from './dashboard.models';
 
-export type FleetPeriodPreset = '30d' | '3m' | '6m' | '1y';
+export type FleetPeriodPreset = '1m' | '3m' | '6m' | '1y';
 
 /** An inclusive period ending today; month-based presets use calendar months. */
 export function fleetPeriod(preset: FleetPeriodPreset, today = new Date()): FleetPeriod {
-  const start = preset === '30d'
-    ? new Date(today.getFullYear(), today.getMonth(), today.getDate())
-    : addCalendarMonths(today, -(preset === '3m' ? 3 : preset === '6m' ? 6 : 12));
-  start.setDate(start.getDate() + (preset === '30d' ? -29 : 1));
+  const months = preset === '1m' ? 1 : preset === '3m' ? 3 : preset === '6m' ? 6 : 12;
+  const start = addCalendarMonths(today, -months);
+  start.setDate(start.getDate() + 1);
   return { from: toLocalIsoDate(start), to: toLocalIsoDate(today) };
 }
 
