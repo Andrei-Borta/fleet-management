@@ -42,3 +42,17 @@ start, end, status}`, ordered by `start`. `type` is `reservation` (pending and a
   cost reporting. Remove a site only when no reservations reference it.
 - A site's dates cannot be changed to exclude an approved reservation (409). A reservation outside
   the site dates is rejected on creation (422) and on approval, if the site has changed since (409).
+- `GET /dashboard/fleet?from=&to=` returns availability and utilization for an inclusive period
+  (`422` when `to` is before `from`). `by_status` has every status, including zeroes. It is a
+  snapshot at today when today falls inside the period, otherwise at `to`: equipment with an
+  approved reservation on that day counts as `reserved` unless it is defective, in service or
+  retired. `by_type` is ordered by count. Utilization is approved reservation days / period days,
+  clipping reservations to the period and merging overlaps. Retired equipment is counted in
+  `by_status`/`by_type` but left out of `utilization`, `top_used` and `least_used`; the rankings
+  return at most five items.
+- `GET /dashboard/costs?site_id=` returns one row per site (or only the requested site, `404` if it
+  does not exist). Equipment cost is approved reservation days × 8h × `hourly_cost`. Maintenance
+  cost is labour + parts for an intervention attributed to the site whose approved reservation of
+  that equipment contains the intervention's `scheduled_date`; otherwise it is unattributed. Each row
+  has `budget`, `equipment_cost`, `maintenance_cost`, `spent`, `remaining`, `percent_used` and
+  `over_budget`.
