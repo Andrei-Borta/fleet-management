@@ -13,7 +13,10 @@ const fleet = {
     { status: 'retired', count: 2 },
   ],
   by_type: [],
-  utilization: [],
+  utilization: [
+    { equipment_id: 1, name: 'Excavator', type: 'Excavator', reserved_days: 15, period_days: 30, utilization_percent: 50 },
+    { equipment_id: 2, name: 'Loader', type: 'Loader', reserved_days: 0, period_days: 30, utilization_percent: 0 },
+  ],
   top_used: [],
   least_used: [],
 };
@@ -59,7 +62,49 @@ test('validates and applies a custom inclusive period', async ({ page }) => {
   await expect(page.getByTestId('kpi-total')).toContainText('2');
   expect(requests[1]).toBe('2026-06-10/2026-06-10');
   await expect(page.getByRole('alert')).toHaveCount(0);
-  await expect(page.getByText('Utilization is approved reservation days', { exact: false })).toBeVisible();
+});
+
+test('shows chart data and updates utilization for the selected period', async ({ page }) => {
+  let requests = 0;
+  await page.route('**/api/v1/dashboard/fleet?*', async (route) => {
+    requests++;
+    const utilization = requests === 1 ? fleet.utilization : [{ ...fleet.utilization[0], utilization_percent: 75 }];
+    await route.fulfill({ json: { ...fleet, utilization } });
+  });
+  await page.goto('/dashboard');
+  const status = page.getByRole('list', { name: 'Status distribution' });
+  await expect(status.getByRole('listitem').filter({ hasText: 'Retired' })).toContainText('2');
+  const utilization = page.getByRole('list', { name: 'Equipment utilization' });
+  await expect(utilization.getByRole('listitem').filter({ hasText: 'Excavator' })).toContainText('50%');
+  await expect(utilization.getByRole('listitem').filter({ hasText: 'Loader' })).toContainText('0%');
+  await page.getByTestId('period-from').fill('2026-06-01');
+  await page.getByTestId('period-to').fill('2026-06-30');
+  await page.getByRole('button', { name: 'Apply period' }).click();
+  await expect(utilization.getByRole('listitem')).toHaveCount(1);
+  await expect(utilization.getByRole('listitem').first()).toContainText('75%');
+  await expect(page.locator('canvas')).toHaveCount(2);
+  for (const canvas of await page.locator('canvas').all()) {
+    await expect.poll(() => canvas.evaluate((element: HTMLCanvasElement) => {
+      const context = element.getContext('2d');
+      if (!context) return false;
+      const pixels = context.getImageData(0, 0, element.width, element.height).data;
+      return pixels.some((value, index) => index % 4 === 3 && value > 0);
+    })).toBe(true);
+  }
+});
+
+test('pages through utilization without dropping equipment', async ({ page }) => {
+  const utilization = Array.from({ length: 9 }, (_, i) => ({ ...fleet.utilization[0], equipment_id: i + 1, name: `Machine ${i + 1}` }));
+  await page.route('**/api/v1/dashboard/fleet?*', (route) => route.fulfill({ json: { ...fleet, utilization } }));
+  await page.goto('/dashboard');
+  const list = page.getByRole('list', { name: 'Equipment utilization' });
+  await expect(list.getByRole('listitem')).toHaveCount(8);
+  await page.getByRole('button', { name: 'Next equipment' }).click();
+  await expect(list.getByRole('listitem')).toHaveCount(1);
+  await expect(list.getByRole('listitem').first()).toContainText('Machine 9');
+  await expect(list.getByRole('listitem').first()).toContainText('50%');
+  await page.getByRole('button', { name: 'Previous equipment' }).click();
+  await expect(list.getByText('Machine 1', { exact: true })).toBeVisible();
 });
 
 test('retries the applied period after a failed request', async ({ page }) => {
@@ -88,12 +133,14 @@ test('retries the applied period after a failed request', async ({ page }) => {
 
 test('shows zero counts and an empty state for an empty fleet', async ({ page }) => {
   await page.route('**/api/v1/dashboard/fleet?*', (route) =>
-    route.fulfill({ json: { ...fleet, total_equipment: 0, by_status: [] } }),
+    route.fulfill({ json: { ...fleet, total_equipment: 0, by_status: [], utilization: [] } }),
   );
   await page.goto('/dashboard');
   await expect(page.getByTestId('kpi-total')).toContainText('0');
   await expect(page.getByTestId('kpi-available')).toContainText('0');
   await expect(page.getByText('No equipment in the fleet yet.')).toBeVisible();
+  await expect(page.getByText('No equipment to display.')).toBeVisible();
+  await expect(page.getByText('No active equipment to display.')).toBeVisible();
 });
 
 test('shows loading and retries a failed request', async ({ page }) => {
@@ -123,8 +170,15 @@ for (const width of [375, 1440]) {
     await page.route('**/api/v1/dashboard/fleet?*', (route) => route.fulfill({ json: fleet }));
     await page.goto('/dashboard');
     await expect(page.getByTestId('fleet-kpis')).toBeVisible();
+    if (width === 1440) {
+      const field = await page.getByTestId('period-from').locator('..').boundingBox();
+      const button = await page.getByRole('button', { name: 'Apply period' }).boundingBox();
+      expect(field).not.toBeNull();
+      expect(button).not.toBeNull();
+      expect(Math.abs(field!.y + field!.height / 2 - (button!.y + button!.height / 2))).toBeLessThan(3);
+    }
     for (const theme of ['light', 'dark']) {
-      await page.evaluate((value) => (document.documentElement.dataset['theme'] = value), theme);
+      if (theme === 'dark') await page.getByTestId('theme-toggle').click();
       await expect(page.getByTestId('kpi-service-defective')).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
         width,
