@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { API_URL } from '../../core/api';
 import { addCalendarMonths, toLocalIsoDate } from '../../shared/date-utils';
+import { Reservation } from '../reservations/reservations.models';
 import { FleetPeriod, FleetStats } from './dashboard.models';
 
 export type FleetPeriodPreset = '1m' | '3m' | '6m' | '1y';
@@ -21,6 +22,12 @@ export class DashboardService {
   fleet(period: FleetPeriod) {
     return this.http.get<FleetStats>(`${API_URL}/dashboard/fleet`, {
       params: { from: period.from, to: period.to },
+    });
+  }
+
+  pendingRequests() {
+    return this.http.get<Reservation[]>(`${API_URL}/reservations`, {
+      params: { status: 'pending' },
     });
   }
 }

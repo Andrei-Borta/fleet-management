@@ -24,6 +24,7 @@ import { StatusBadge } from '../../shared/status-badge/status-badge';
 import { EquipmentStatus } from '../equipment/equipment.models';
 import { FleetPeriod, FleetStats } from './dashboard.models';
 import { DashboardService, fleetPeriod, FleetPeriodPreset } from './dashboard.service';
+import { PendingRequestsWidget } from './pending-requests.widget';
 
 const LOAD_ANIMATION_MS = 600;
 
@@ -31,7 +32,7 @@ const LOAD_ANIMATION_MS = 600;
   selector: 'app-dashboard-page',
   imports: [
     PageHeader, StatusBadge, MatButtonModule, MatButtonToggleModule,
-    MatProgressBarModule, BaseChartDirective,
+    MatProgressBarModule, BaseChartDirective, PendingRequestsWidget,
   ],
   providers: [provideCharts({
     registerables: [ArcElement, BarController, BarElement, CategoryScale, DoughnutController, LinearScale, Tooltip],
@@ -118,6 +119,7 @@ const LOAD_ANIMATION_MS = 600;
         </div>
       }
     </section>
+    <app-pending-requests-widget />
   `,
   styles: `
     .chart-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-4); }

@@ -21,6 +21,84 @@ const fleet = {
   least_used: [],
 };
 
+const pendingRequest = {
+  id: 1,
+  equipment_id: 1,
+  site_id: 1,
+  start_date: '2026-11-10',
+  end_date: '2026-11-12',
+  status: 'pending',
+  requested_by_role: 'site_manager',
+  note: null,
+};
+
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/reservations?status=pending', (route) => route.fulfill({ json: [] }));
+});
+
+test('shows pending requests and opens the pending reservations tab', async ({ page }) => {
+  await page.route('**/api/v1/dashboard/fleet?*', (route) => route.fulfill({ json: fleet }));
+  await page.route('**/api/v1/reservations?status=pending', (route) =>
+    route.fulfill({ json: [pendingRequest, { ...pendingRequest, id: 2 }] }),
+  );
+  await page.route('**/api/v1/reservations', (route) => route.fulfill({ json: [pendingRequest] }));
+  await page.route('**/api/v1/sites', (route) => route.fulfill({ json: [{ id: 1, name: 'Bridge' }] }));
+  await page.route('**/api/v1/equipment', (route) => route.fulfill({ json: [{ id: 1, name: 'Excavator' }] }));
+  await page.goto('/dashboard');
+  const widget = page.getByRole('region', { name: 'Pending requests' });
+  await expect(widget).toContainText('2 requests awaiting approval');
+  await widget.getByRole('link', { name: 'View requests' }).click();
+  await expect(page).toHaveURL(/\/reservations$/);
+  await expect(page.getByRole('tab', { name: 'Pending' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('cell', { name: 'Bridge' })).toBeVisible();
+});
+
+test('shows an empty state for pending requests', async ({ page }) => {
+  await page.goto('/dashboard');
+  const widget = page.getByRole('region', { name: 'Pending requests' });
+  await expect(widget.getByText('No pending requests.')).toBeVisible();
+  await expect(widget.getByRole('link', { name: 'View requests' })).toBeVisible();
+});
+
+test('loads and retries pending requests independently of fleet data', async ({ page }) => {
+  let release!: () => void;
+  const waiting = new Promise<void>((resolve) => (release = resolve));
+  let attempts = 0;
+  await page.route('**/api/v1/dashboard/fleet?*', (route) => route.fulfill({ json: fleet }));
+  await page.route('**/api/v1/reservations?status=pending', async (route) => {
+    attempts++;
+    if (attempts === 1) {
+      await waiting;
+      await route.fulfill({ status: 500, json: { detail: 'Unavailable' } });
+    } else {
+      await route.fulfill({ json: [pendingRequest] });
+    }
+  });
+  await page.goto('/dashboard');
+  const widget = page.getByRole('region', { name: 'Pending requests' });
+  await expect(widget.getByRole('progressbar', { name: 'Loading pending requests' })).toBeVisible();
+  await expect(page.getByTestId('fleet-kpis')).toBeVisible();
+  release();
+  await expect(widget.getByText('Pending requests could not be loaded.')).toBeVisible();
+  await widget.getByRole('button', { name: 'Retry' }).click();
+  await expect(widget).toContainText('1 request awaiting approval');
+  await expect(page.getByTestId('fleet-kpis')).toBeVisible();
+});
+
+test('shows pending requests even if fleet data fails', async ({ page }) => {
+  await page.route('**/api/v1/dashboard/fleet?*', (route) =>
+    route.fulfill({ status: 500, json: { detail: 'Unavailable' } }),
+  );
+  await page.route('**/api/v1/reservations?status=pending', (route) =>
+    route.fulfill({ json: [pendingRequest] }),
+  );
+  await page.goto('/dashboard');
+  await expect(page.getByText('Fleet availability could not be loaded.')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Pending requests' })).toContainText(
+    '1 request awaiting approval',
+  );
+});
+
 test('shows fleet availability for the last month', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-11-10T12:00:00'));
   await page.route('**/api/v1/dashboard/fleet?*', async (route) => {
