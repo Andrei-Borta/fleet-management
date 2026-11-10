@@ -18,7 +18,9 @@ def test_due_lists_overdue_equipment(client: TestClient) -> None:
         },
     ).json()
     try:
-        response = client.get("/api/v1/maintenance/due", params={"within_days": 0, "within_hours": 0})
+        response = client.get(
+            "/api/v1/maintenance/due", params={"within_days": 0, "within_hours": 0}
+        )
         assert response.status_code == 200
         row = next(item for item in response.json() if item["equipment_id"] == created["id"])
         assert row["overdue"] is True

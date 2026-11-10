@@ -228,7 +228,9 @@ def test_list_due_equipment(db: Session) -> None:
 
     rows = [
         row
-        for row in service.list_due_equipment(db, within_days=7, within_hours=Decimal(10), today=TODAY)
+        for row in service.list_due_equipment(
+            db, within_days=7, within_hours=Decimal(10), today=TODAY
+        )
         if row.equipment_id in mine
     ]
 
