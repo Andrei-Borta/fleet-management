@@ -17,6 +17,7 @@ from app.modules.reservations.models import Reservation, ReservationStatus
 from app.modules.sites.models import Site
 
 FLEET_URL = "/api/v1/dashboard/fleet"
+COSTS_URL = "/api/v1/dashboard/costs"
 
 
 @pytest.fixture(autouse=True)
@@ -93,6 +94,40 @@ def test_fleet_endpoint_returns_counts_and_utilization(
     ]
     assert body["top_used"] == body["utilization"]
     assert body["least_used"] == body["utilization"]
+
+
+def test_costs_endpoint_returns_money_as_numbers(
+    dashboard_client: TestClient, scenario: dict[str, int]
+) -> None:
+    response = dashboard_client.get(COSTS_URL)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {
+        "sites": [
+            {
+                "site_id": scenario["site_id"],
+                "site_name": "East site",
+                "budget": 10000.0,
+                "equipment_cost": 2400.0,
+                "maintenance_cost": 0.0,
+                "spent": 2400.0,
+                "remaining": 7600.0,
+                "percent_used": 24.0,
+                "over_budget": False,
+            }
+        ]
+    }
+
+
+def test_costs_endpoint_filters_by_site(
+    dashboard_client: TestClient, scenario: dict[str, int]
+) -> None:
+    response = dashboard_client.get(COSTS_URL, params={"site_id": scenario["site_id"]})
+
+    assert response.status_code == 200
+    assert [row["site_id"] for row in response.json()["sites"]] == [scenario["site_id"]]
+    assert dashboard_client.get(COSTS_URL, params={"site_id": 99999999}).status_code == 404
 
 
 @pytest.mark.parametrize(

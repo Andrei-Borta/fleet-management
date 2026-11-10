@@ -1,6 +1,6 @@
-"""Service coverage for dashboard availability and utilization aggregates."""
+"""Service coverage for dashboard availability, utilization and cost aggregates."""
 
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
@@ -8,10 +8,16 @@ import pytest
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
-from app.core.errors import InvalidDataError
+from app.core.errors import InvalidDataError, NotFoundError
 from app.modules.dashboard import service
 from app.modules.equipment.models import Equipment, EquipmentStatus
-from app.modules.maintenance.models import Defect, InterventionPart, ServiceIntervention
+from app.modules.maintenance.models import (
+    Defect,
+    InterventionKind,
+    InterventionPart,
+    InterventionStatus,
+    ServiceIntervention,
+)
 from app.modules.reservations.models import Reservation, ReservationStatus
 from app.modules.sites.models import Site
 
@@ -81,6 +87,40 @@ def reserve(
     db.add(reservation)
     db.flush()
     return reservation
+
+
+def maintain(
+    db: Session,
+    equipment: Equipment,
+    scheduled: date,
+    labor_hours: Decimal = Decimal("0.00"),
+    labor_rate: Decimal = Decimal("0.00"),
+    status: InterventionStatus = InterventionStatus.PLANNED,
+    parts: list[tuple[str, int, Decimal]] | None = None,
+) -> ServiceIntervention:
+    intervention = ServiceIntervention(
+        equipment_id=equipment.id,
+        description="Repair",
+        kind=InterventionKind.REPAIR,
+        scheduled_date=scheduled,
+        status=status,
+        started_at=datetime(2099, 4, 1, tzinfo=UTC),
+        labor_hours=labor_hours,
+        labor_rate=labor_rate,
+    )
+    db.add(intervention)
+    db.flush()
+    for name, qty, unit_cost in parts or []:
+        db.add(
+            InterventionPart(
+                intervention_id=intervention.id,
+                name=name,
+                qty=qty,
+                unit_cost=unit_cost,
+            )
+        )
+    db.flush()
+    return intervention
 
 
 # --- fleet availability & utilization (#11) ---------------------------------
@@ -216,3 +256,155 @@ def test_top_and_least_used_are_limited_to_five(db: Session) -> None:
 def test_fleet_stats_rejects_an_inverted_period(db: Session) -> None:
     with pytest.raises(InvalidDataError, match="'to' must not be before 'from'"):
         service.fleet_stats(db, D.replace(day=2), D)
+
+
+# --- operating cost per site vs budget (#12) --------------------------------
+
+
+def test_equipment_cost_uses_approved_reservation_days(db: Session) -> None:
+    equipment = make_equipment(db, hourly_cost=Decimal("100.00"))
+    site = make_site(db, budget=Decimal("10000.00"))
+    reserve(db, equipment, site, D, D.replace(day=3), ReservationStatus.APPROVED)
+    reserve(db, equipment, site, D.replace(day=5), D.replace(day=9), ReservationStatus.PENDING)
+
+    report = service.site_costs(db)
+
+    cost = report.sites[0]
+    assert cost.equipment_cost == Decimal("2400.00")
+    assert cost.maintenance_cost == Decimal("0.00")
+    assert cost.spent == Decimal("2400.00")
+    assert cost.remaining == Decimal("7600.00")
+    assert cost.percent_used == 24.0
+    assert cost.over_budget is False
+
+
+def test_costs_are_reported_per_site_and_can_be_filtered(db: Session) -> None:
+    north = make_site(db, name="North", budget=Decimal("1000.00"))
+    south = make_site(db, name="South", budget=Decimal("5000.00"))
+    cheap = make_equipment(db, hourly_cost=Decimal("10.00"))
+    pricey = make_equipment(db, hourly_cost=Decimal("50.00"))
+    reserve(db, cheap, north, D, D)  # 1 day * 8h * 10 = 80
+    reserve(db, pricey, south, D, D.replace(day=2))  # 2 days * 8h * 50 = 800
+
+    report = service.site_costs(db)
+
+    assert [(row.site_name, row.spent) for row in report.sites] == [
+        ("North", Decimal("80.00")),
+        ("South", Decimal("800.00")),
+    ]
+
+    filtered = service.site_costs(db, south.id)
+    assert [row.site_name for row in filtered.sites] == ["South"]
+    assert filtered.sites[0].spent == Decimal("800.00")
+
+
+def test_maintenance_cost_is_attributed_by_scheduled_date(db: Session) -> None:
+    equipment = make_equipment(db, hourly_cost=Decimal("50.00"))
+    site = make_site(db, budget=Decimal("10000.00"))
+    reserve(db, equipment, site, D, D.replace(day=9), ReservationStatus.APPROVED)
+    # 2h * 100 + two parts (1 * 300, 2 * 25) = 550, inside the reservation window.
+    maintain(
+        db,
+        equipment,
+        D.replace(day=5),
+        labor_hours=Decimal("2.00"),
+        labor_rate=Decimal("100.00"),
+        parts=[("Pump", 1, Decimal("300.00")), ("Seals", 2, Decimal("25.00"))],
+    )
+    # Outside every approved reservation, so it stays unattributed.
+    maintain(
+        db,
+        equipment,
+        D.replace(day=20),
+        labor_hours=Decimal("5.00"),
+        labor_rate=Decimal("100.00"),
+    )
+
+    cost = service.site_costs(db).sites[0]
+
+    assert cost.equipment_cost == Decimal("3600.00")
+    assert cost.maintenance_cost == Decimal("550.00")
+    assert cost.spent == Decimal("4150.00")
+
+
+def test_maintenance_without_parts_or_labour_costs_nothing(db: Session) -> None:
+    equipment = make_equipment(db)
+    site = make_site(db)
+    reserve(db, equipment, site, D, D)
+    maintain(db, equipment, D)
+
+    cost = service.site_costs(db).sites[0]
+
+    assert cost.equipment_cost == Decimal("800.00")
+    assert cost.maintenance_cost == Decimal("0.00")
+
+
+def test_over_budget_site_is_flagged(db: Session) -> None:
+    equipment = make_equipment(db, hourly_cost=Decimal("100.00"))
+    site = make_site(db, budget=Decimal("1000.00"))
+    reserve(db, equipment, site, D, D.replace(day=3))
+
+    cost = service.site_costs(db).sites[0]
+
+    assert cost.spent == Decimal("2400.00")
+    assert cost.remaining == Decimal("-1400.00")
+    assert cost.percent_used == 240.0
+    assert cost.over_budget is True
+
+
+@pytest.mark.parametrize(
+    ("budget", "spent_equipment", "expected_percent", "over_budget"),
+    [
+        (Decimal("0.00"), None, 0.0, False),
+        (Decimal("0.00"), Decimal("100.00"), 100.0, True),
+    ],
+)
+def test_zero_budget_does_not_divide_by_zero(
+    db: Session,
+    budget: Decimal,
+    spent_equipment: Decimal | None,
+    expected_percent: float,
+    over_budget: bool,
+) -> None:
+    site = make_site(db, budget=budget)
+    if spent_equipment is not None:
+        equipment = make_equipment(db, hourly_cost=spent_equipment)
+        reserve(db, equipment, site, D, D)
+
+    cost = service.site_costs(db).sites[0]
+
+    assert cost.percent_used == expected_percent
+    assert cost.over_budget is over_budget
+
+
+def test_site_costs_without_reservations_are_zero(db: Session) -> None:
+    make_site(db, name="Empty", budget=Decimal("500.00"))
+
+    cost = service.site_costs(db).sites[0]
+
+    assert cost.equipment_cost == Decimal("0.00")
+    assert cost.maintenance_cost == Decimal("0.00")
+    assert cost.spent == Decimal("0.00")
+    assert cost.remaining == Decimal("500.00")
+    assert cost.percent_used == 0.0
+
+
+def test_site_costs_without_sites_returns_an_empty_report(db: Session) -> None:
+    assert service.site_costs(db).sites == []
+
+
+def test_unknown_site_raises_not_found(db: Session) -> None:
+    with pytest.raises(NotFoundError, match="Site not found"):
+        service.site_costs(db, 99999999)
+
+
+def test_costs_ignore_reservations_of_other_sites_when_filtering(db: Session) -> None:
+    north = make_site(db, name="North")
+    south = make_site(db, name="South")
+    equipment = make_equipment(db)
+    reserve(db, equipment, north, D, D)
+    reserve(db, equipment, south, D, D)
+
+    report = service.site_costs(db, north.id)
+
+    assert [(row.site_name, row.spent) for row in report.sites] == [("North", Decimal("800.00"))]

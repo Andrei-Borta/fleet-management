@@ -5,20 +5,27 @@ Every public function here MUST have pytest tests (see AGENTS.md).
 
 from collections import Counter
 from datetime import date, timedelta
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.errors import InvalidDataError
+from app.core.errors import InvalidDataError, NotFoundError
 from app.modules.dashboard.schemas import (
     EquipmentUtilization,
     FleetStats,
+    SiteCost,
+    SiteCostsReport,
     StatusCount,
     TypeCount,
 )
 from app.modules.equipment.models import Equipment, EquipmentStatus
+from app.modules.maintenance.models import InterventionPart, ServiceIntervention
 from app.modules.reservations.models import Reservation, ReservationStatus
+from app.modules.sites.models import Site
 
+HOURS_PER_RESERVATION_DAY = Decimal("8.00")
+MONEY = Decimal("0.01")
 TOP_EQUIPMENT = 5
 
 
@@ -124,3 +131,109 @@ def fleet_stats(db: Session, start: date, end: date) -> FleetStats:
         top_used=top_used,
         least_used=least_used,
     )
+
+
+def _money(value: Decimal) -> Decimal:
+    return value.quantize(MONEY)
+
+
+def _parts_costs(db: Session, intervention_ids: list[int]) -> dict[int, Decimal]:
+    if not intervention_ids:
+        return {}
+    parts = db.scalars(
+        select(InterventionPart).where(InterventionPart.intervention_id.in_(intervention_ids))
+    ).all()
+    costs: dict[int, Decimal] = {}
+    for part in parts:
+        costs[part.intervention_id] = costs.get(part.intervention_id, Decimal(0)) + (
+            Decimal(part.qty) * part.unit_cost
+        )
+    return costs
+
+
+def _intervention_cost(intervention: ServiceIntervention, parts_cost: Decimal) -> Decimal:
+    labor = Decimal(intervention.labor_hours or 0) * Decimal(intervention.labor_rate or 0)
+    return _money(labor + parts_cost)
+
+
+def _scheduled_within(day: date, intervals: list[tuple[date, date]]) -> bool:
+    return any(start <= day <= end for start, end in intervals)
+
+
+def _percent_used(spent: Decimal, budget: Decimal) -> float:
+    if budget == 0:
+        return 0.0 if spent == 0 else 100.0
+    return round(float(spent / budget * 100), 2)
+
+
+def site_costs(db: Session, site_id: int | None = None) -> SiteCostsReport:
+    """Operating cost compared with each site's budget.
+
+    Equipment cost is ``approved reservation days × 8h × hourly_cost``. A maintenance
+    intervention is attributed to the site whose approved reservation of that equipment
+    contains the intervention's scheduled date; otherwise it stays unattributed.
+    """
+    if site_id is not None:
+        site = db.get(Site, site_id)
+        if site is None:
+            raise NotFoundError("Site not found")
+        sites = [site]
+    else:
+        sites = list(db.scalars(select(Site).order_by(Site.id)).all())
+
+    included_site_ids = {site.id for site in sites}
+    equipment_costs = {site.id: Decimal(0) for site in sites}
+    maintenance_costs = {site.id: Decimal(0) for site in sites}
+    reservation_windows: dict[tuple[int, int], list[tuple[date, date]]] = {}
+    equipment_ids: set[int] = set()
+
+    reservations = db.execute(
+        select(Reservation, Equipment)
+        .join(Equipment, Reservation.equipment_id == Equipment.id)
+        .where(Reservation.status == ReservationStatus.APPROVED)
+    ).all()
+
+    for reservation, equipment in reservations:
+        if reservation.site_id not in included_site_ids:
+            continue
+        days = _inclusive_days(reservation.start_date, reservation.end_date)
+        equipment_costs[reservation.site_id] += (
+            Decimal(days) * HOURS_PER_RESERVATION_DAY * equipment.hourly_cost
+        )
+        reservation_windows.setdefault((reservation.site_id, equipment.id), []).append(
+            (reservation.start_date, reservation.end_date)
+        )
+        equipment_ids.add(equipment.id)
+
+    if equipment_ids:
+        interventions = db.scalars(
+            select(ServiceIntervention).where(ServiceIntervention.equipment_id.in_(equipment_ids))
+        ).all()
+        parts_costs = _parts_costs(db, [item.id for item in interventions])
+        for intervention in interventions:
+            cost = _intervention_cost(intervention, parts_costs.get(intervention.id, Decimal(0)))
+            for site in sites:
+                windows = reservation_windows.get((site.id, intervention.equipment_id), [])
+                if _scheduled_within(intervention.scheduled_date, windows):
+                    maintenance_costs[site.id] += cost
+                    break
+
+    rows = []
+    for site in sites:
+        equipment_cost = _money(equipment_costs[site.id])
+        maintenance_cost = _money(maintenance_costs[site.id])
+        spent = _money(equipment_cost + maintenance_cost)
+        rows.append(
+            SiteCost(
+                site_id=site.id,
+                site_name=site.name,
+                budget=site.budget,
+                equipment_cost=equipment_cost,
+                maintenance_cost=maintenance_cost,
+                spent=spent,
+                remaining=_money(site.budget - spent),
+                percent_used=_percent_used(spent, site.budget),
+                over_budget=spent > site.budget,
+            )
+        )
+    return SiteCostsReport(sites=rows)

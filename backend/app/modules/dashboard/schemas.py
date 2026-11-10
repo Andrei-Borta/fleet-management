@@ -1,8 +1,9 @@
 """Request and response models for dashboard aggregates."""
 
 from datetime import date
+from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 
 from app.modules.equipment.models import EquipmentStatus
 
@@ -38,3 +39,23 @@ class FleetStats(BaseModel):
     utilization: list[EquipmentUtilization]
     top_used: list[EquipmentUtilization]
     least_used: list[EquipmentUtilization]
+
+
+class SiteCost(BaseModel):
+    site_id: int
+    site_name: str
+    budget: Decimal
+    equipment_cost: Decimal
+    maintenance_cost: Decimal
+    spent: Decimal
+    remaining: Decimal
+    percent_used: float
+    over_budget: bool
+
+    @field_serializer("budget", "equipment_cost", "maintenance_cost", "spent", "remaining")
+    def serialize_money(self, value: Decimal) -> float:
+        return float(value)
+
+
+class SiteCostsReport(BaseModel):
+    sites: list[SiteCost]

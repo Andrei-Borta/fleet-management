@@ -42,3 +42,9 @@
   ordered by count. Utilization is approved reservation days / period days, clipping reservations to
   the period and merging overlaps. Retired equipment is counted in `by_status`/`by_type` but left out
   of `utilization`, `top_used` and `least_used`; the rankings return at most five items.
+- `GET /dashboard/costs?site_id=` returns one row per site (or only the requested site, `404` if it
+  does not exist). Equipment cost is approved reservation days × 8h × `hourly_cost`. Maintenance
+  cost is labour + parts for an intervention attributed to the site whose approved reservation of
+  that equipment contains the intervention's `scheduled_date`; otherwise it is unattributed. Each row
+  has `budget`, `equipment_cost`, `maintenance_cost`, `spent`, `remaining`, `percent_used` and
+  `over_budget`.
