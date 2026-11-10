@@ -56,3 +56,9 @@ start, end, status}`, ordered by `start`. `type` is `reservation` (pending and a
   that equipment contains the intervention's `scheduled_date`; otherwise it is unattributed. Each row
   has `budget`, `equipment_cost`, `maintenance_cost`, `spent`, `remaining`, `percent_used` and
   `over_budget`.
+- `GET /maintenance/due?within_days=&within_hours=` lists equipment whose service is overdue or will be
+  within the given days (default 7) or engine hours (default 50); both are `>= 0` (`422` otherwise).
+  Retired equipment is left out. Each row is `{equipment_id, name, type, status, days_until_due,
+  hours_until_due, overdue}`; the `*_until_due` values are negative when overdue and `null` when that
+  interval or its last-service reading is not set. Overdue rows come first. This only reports: it does not
+  change the equipment status.
