@@ -8,6 +8,7 @@ from app.core.deps import CurrentRole, DbSession
 from app.modules.reservations import service
 from app.modules.reservations.models import ReservationStatus
 from app.modules.reservations.schemas import (
+    AlternativeRead,
     CalendarEventRead,
     ReservationConflictBody,
     ReservationCreate,
@@ -22,7 +23,9 @@ CONFLICT_RESPONSE = {status.HTTP_409_CONFLICT: {"model": ReservationConflictBody
 async def reservation_conflict_handler(
     _request: Request, exc: service.ReservationConflictError
 ) -> JSONResponse:
-    body = ReservationConflictBody(detail=str(exc), conflicts=exc.conflicts)
+    body = ReservationConflictBody(
+        detail=str(exc), conflicts=exc.conflicts, alternatives=exc.alternatives
+    )
     return JSONResponse(status_code=status.HTTP_409_CONFLICT, content=body.model_dump(mode="json"))
 
 
@@ -46,6 +49,12 @@ def calendar(
     equipment_id: int | None = None,
 ) -> list[CalendarEventRead]:
     return service.list_calendar_events(db, range_start, range_end, site_id, equipment_id)
+
+
+@router.get("/alternatives", response_model=list[AlternativeRead])
+def alternatives(db: DbSession, equipment_id: int, start: date, end: date) -> list[AlternativeRead]:
+    equipment = service.find_alternatives(db, equipment_id, start, end)
+    return [AlternativeRead.model_validate(e) for e in equipment]
 
 
 @router.post(
