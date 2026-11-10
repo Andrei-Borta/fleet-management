@@ -1,4 +1,4 @@
-"""Request and response models for service interventions."""
+"""Pydantic schemas (request/response) for the maintenance module."""
 
 from datetime import date, datetime
 from decimal import Decimal
@@ -7,7 +7,23 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 from pydantic.json_schema import SkipJsonSchema
 
+from app.modules.equipment.models import EquipmentStatus
 from app.modules.maintenance.models import InterventionKind, InterventionStatus
+
+
+class DueEquipmentRead(BaseModel):
+    equipment_id: int
+    name: str
+    type: str
+    status: EquipmentStatus
+    days_until_due: int | None
+    hours_until_due: Decimal | None
+    overdue: bool
+
+    @field_serializer("hours_until_due", when_used="json")
+    def serialize_hours(self, value: Decimal | None) -> float | None:
+        return None if value is None else float(value)
+
 
 Amount = Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2, allow_inf_nan=False)]
 

@@ -1,0 +1,25 @@
+.table-scroll {
+  overflow-x: auto;
+}
+
+table {
+  min-width: 30rem;
+}
+
+th.mat-mdc-header-cell {
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+}
+
+tr.mat-mdc-row {
+  height: 52px;
+}
+
+tr.mat-mdc-row:hover {
+  background: var(--color-surface-alt);
+}
+
+.numeric {
+  text-align: right;
+  white-space: nowrap;
+}

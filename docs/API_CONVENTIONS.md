@@ -9,6 +9,11 @@
 - A reservation `409` caused by a booking or blocked equipment also has `"conflicts"`, a list of
   `{kind, id, start_date, end_date, status}`. `kind` is `reservation` or `maintenance`; `end_date`
   is `null` for maintenance in progress. It is empty when the equipment itself is blocked.
+- `"alternatives"` in `409` lists other equipment of the same type that can be reserved for
+  the period, as `{id, name, type, status, hourly_cost}`, cheapest first (ties by `id`). It skips
+  defective, in service or retired equipment and anything booked or in maintenance then. It may be empty.
+- `GET /reservations/alternatives?equipment_id=&start=&end=` returns the same list on demand. All three
+  are required and the dates are inclusive (`422` when `end` is before `start`, `404` for unknown equipment).
 - Role: header `X-Role: site_manager | fleet_manager | mechanic | operator` (default `fleet_manager`).
 - Money: `Decimal` serialized as a number with 2 decimals. Currency: RON.
 - Frontend models mirror the response schemas in `features/<x>/<x>.models.ts`. Check them against
@@ -30,7 +35,7 @@
 - `GET /reservations/calendar?from=&to=&site_id=&equipment_id=` feeds the central calendar. `from` and
   `to` are required, inclusive ISO dates, at most 93 days apart (`422` otherwise, also when `to` is
   before `from`). It returns events `{type, id, equipment: {id, name, type}, site: {id, name} | null,
-  start, end, status}`, ordered by `start`. `type` is `reservation` (pending and approved only) or
+start, end, status}`, ordered by `start`. `type` is `reservation` (pending and approved only) or
   `maintenance` (planned, in progress or done); `id` is the reservation or intervention id. Maintenance
   has no site and `end` is `null` while in progress. Filtering by `site_id` returns reservations only.
 - Sites with any reservations cannot be deleted (409), preserving reservation history and site
@@ -42,7 +47,28 @@
   `equipment_id` and `status` filters. Create uses equipment, optional defect, kind, scheduled date,
   optional description, labour hours and rate. Status progresses `planned` → `in_progress` → `done`;
   completed interventions cannot be changed. Part creation returns the updated intervention with
-  parts and total cost (parts plus labour hours × rate, rounded to two decimals). A planned job may
-  not overlap an approved reservation. An intervention cannot start before its scheduled date, and
-  starting it is rejected if the open-ended work would overlap an approved reservation. Closing a
-  revision records the equipment's service readings.
+  parts and total cost (parts plus labour hours × rate, rounded to two decimals). Revisions cannot
+  overlap approved reservations or start before their scheduled date; starting one is rejected if its
+  open-ended work would overlap an approved reservation. Repairs can be scheduled and started despite
+  approved reservations. Completing a repair resolves its linked defect, if any; completing a revision
+  records the equipment's service readings. Status is recomputed on starting and completing work.
+- `GET /dashboard/fleet?from=&to=` returns availability and utilization for an inclusive period
+  (`422` when `to` is before `from`). `by_status` has every status, including zeroes. It is a
+  snapshot at today when today falls inside the period, otherwise at `to`: equipment with an
+  approved reservation on that day counts as `reserved` unless it is defective, in service or
+  retired. `by_type` is ordered by count. Utilization is approved reservation days / period days,
+  clipping reservations to the period and merging overlaps. Retired equipment is counted in
+  `by_status`/`by_type` but left out of `utilization`, `top_used` and `least_used`; the rankings
+  return at most five items.
+- `GET /dashboard/costs?site_id=` returns one row per site (or only the requested site, `404` if it
+  does not exist). Equipment cost is approved reservation days × 8h × `hourly_cost`. Maintenance
+  cost is labour + parts for an intervention attributed to the site whose approved reservation of
+  that equipment contains the intervention's `scheduled_date`; otherwise it is unattributed. Each row
+  has `budget`, `equipment_cost`, `maintenance_cost`, `spent`, `remaining`, `percent_used` and
+  `over_budget`.
+- `GET /maintenance/due?within_days=&within_hours=` lists equipment whose service is overdue or will be
+  within the given days (default 7) or engine hours (default 50); both are `>= 0` (`422` otherwise).
+  Retired equipment is left out. Each row is `{equipment_id, name, type, status, days_until_due,
+  hours_until_due, overdue}`; the `*_until_due` values are negative when overdue and `null` when that
+  interval or its last-service reading is not set. Overdue rows come first. This only reports: it does not
+  change the equipment status.

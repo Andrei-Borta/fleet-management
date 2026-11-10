@@ -12,8 +12,10 @@ from app.core.deps import Role
 from app.core.errors import ConflictError, InvalidDataError, NotFoundError
 from app.modules.equipment.models import Equipment, EquipmentStatus
 from app.modules.maintenance.models import InterventionStatus, ServiceIntervention
+from app.modules.maintenance.rules import is_service_due
 from app.modules.reservations.models import Reservation, ReservationStatus
 from app.modules.reservations.schemas import (
+    AlternativeRead,
     CalendarEquipmentRead,
     CalendarEventRead,
     CalendarSiteRead,
@@ -34,11 +36,20 @@ CALENDAR_RESERVATION_STATUSES = (ReservationStatus.PENDING, ReservationStatus.AP
 
 
 class ReservationConflictError(ConflictError):
-    """The equipment cannot be reserved for the period; carries what stands in the way."""
+    """The equipment cannot be reserved for the period.
 
-    def __init__(self, message: str, conflicts: list[ConflictRead]) -> None:
+    Carries what stands in the way and free equipment of the same type to pick instead.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        conflicts: list[ConflictRead],
+        alternatives: list[AlternativeRead] | None = None,
+    ) -> None:
         super().__init__(message)
         self.conflicts = conflicts
+        self.alternatives = alternatives or []
 
 
 def periods_overlap(start_a: date, end_a: date, start_b: date, end_b: date) -> bool:
@@ -141,6 +152,28 @@ def find_conflicts(db: Session, equipment_id: int, start: date, end: date) -> li
     return reservation_conflicts + maintenance_conflicts
 
 
+def find_alternatives(db: Session, equipment_id: int, start: date, end: date) -> list[Equipment]:
+    """Other equipment of the same type that is free for the period, cheapest first."""
+    _validate_period(start, end)
+    equipment = db.get(Equipment, equipment_id)
+    if equipment is None:
+        raise NotFoundError("Equipment not found")
+    candidates = db.scalars(
+        select(Equipment)
+        .where(
+            Equipment.type == equipment.type,
+            Equipment.id != equipment.id,
+            Equipment.status.not_in(BLOCKED_STATUSES),
+        )
+        .order_by(Equipment.hourly_cost, Equipment.id)
+    ).all()
+    return [
+        c
+        for c in candidates
+        if not is_service_due(c, start) and not find_conflicts(db, c.id, start, end)
+    ]
+
+
 def ensure_reservable(db: Session, equipment_id: int, start: date, end: date) -> None:
     """Raise unless the equipment can be booked for the period.
 
@@ -152,13 +185,31 @@ def ensure_reservable(db: Session, equipment_id: int, start: date, end: date) ->
         raise NotFoundError("Equipment not found")
     if equipment.status in BLOCKED_STATUSES:
         raise ReservationConflictError(
-            f"Equipment is {equipment.status.value} and cannot be reserved", []
+            f"Equipment is {equipment.status.value} and cannot be reserved",
+            [],
+            _alternatives_for(db, equipment_id, start, end),
+        )
+    if is_service_due(equipment, start):
+        raise ReservationConflictError(
+            f"Equipment '{equipment.name}' is overdue for service and cannot be reserved",
+            [],
+            _alternatives_for(db, equipment_id, start, end),
         )
     conflicts = find_conflicts(db, equipment_id, start, end)
     if conflicts:
         raise ReservationConflictError(
-            "Equipment is already booked or in maintenance for this period", conflicts
+            "Equipment is already booked or in maintenance for this period",
+            conflicts,
+            _alternatives_for(db, equipment_id, start, end),
         )
+
+
+def _alternatives_for(
+    db: Session, equipment_id: int, start: date, end: date
+) -> list[AlternativeRead]:
+    return [
+        AlternativeRead.model_validate(e) for e in find_alternatives(db, equipment_id, start, end)
+    ]
 
 
 def list_reservations(

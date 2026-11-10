@@ -1,0 +1,29 @@
+.table-scroll {
+  overflow-x: auto;
+}
+table {
+  width: 100%;
+}
+th {
+  background: var(--color-surface-alt) !important;
+  color: var(--color-text-muted);
+}
+tr.mat-mdc-row {
+  height: 52px;
+}
+tr.mat-mdc-row:hover {
+  background: var(--color-surface-alt);
+}
+td {
+  white-space: nowrap;
+}
+button + button {
+  margin-left: var(--space-2);
+}
+[role='alert'] {
+  color: var(--color-danger);
+}
+
+.empty-state > .material-symbols-rounded {
+  font-size: var(--space-8);
+}

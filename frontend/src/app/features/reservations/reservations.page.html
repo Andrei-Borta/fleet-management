@@ -1,0 +1,118 @@
+<app-page-header title="Reservations" subtitle="Review requests and manage fleet bookings" />
+<section class="filters-bar">
+  <mat-form-field appearance="outline"
+    ><mat-label>Site</mat-label>
+    <mat-select
+      data-testid="site-filter"
+      [canSelectNullableOptions]="true"
+      [ngModel]="site()"
+      (ngModelChange)="site.set($event); pageIndex.set(0)"
+    >
+      <mat-option [value]="null">All sites</mat-option>
+      @for (s of sites(); track s.id) {
+        <mat-option [value]="s.id">{{ s.name }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+  <button mat-stroked-button (click)="load()" [disabled]="loading() || busy() !== null">
+    Refresh
+  </button>
+</section>
+<section class="card" [attr.aria-busy]="loading()">
+  @if (loading()) {
+    <mat-progress-bar data-testid="page-loading" mode="indeterminate" />
+  }
+  <mat-tab-group [selectedIndex]="tab()" (selectedIndexChange)="tab.set($event); pageIndex.set(0)">
+    <mat-tab label="Pending" /><mat-tab label="Approved" /><mat-tab label="All" />
+  </mat-tab-group>
+  @if (message()) {
+    <p role="alert">{{ message() }}</p>
+  }
+  @if (failed()) {
+    <div class="empty-state">
+      <p>Reservations could not be loaded.</p>
+      <button mat-stroked-button (click)="load()">Retry</button>
+    </div>
+  } @else if (!loading() && filtered().length === 0) {
+    <div class="empty-state">
+      <span class="material-symbols-rounded" aria-hidden="true">event_busy</span>
+      <p>No reservations match these filters.</p>
+    </div>
+  } @else if (!loading()) {
+    <div class="table-scroll">
+      <table mat-table [dataSource]="visible()">
+        <ng-container matColumnDef="equipment"
+          ><th mat-header-cell *matHeaderCellDef class="text-caption">Equipment</th>
+          <td mat-cell *matCellDef="let r">{{ equipmentName(r.equipment_id) }}</td></ng-container
+        >
+        <ng-container matColumnDef="site"
+          ><th mat-header-cell *matHeaderCellDef class="text-caption">Site</th>
+          <td mat-cell *matCellDef="let r">{{ siteName(r.site_id) }}</td></ng-container
+        >
+        <ng-container matColumnDef="dates"
+          ><th mat-header-cell *matHeaderCellDef class="text-caption">Dates</th>
+          <td mat-cell *matCellDef="let r">
+            {{ r.start_date | date: 'dd MMM yyyy' }} – {{ r.end_date | date: 'dd MMM yyyy' }}
+            @if (r.note) {
+              <p class="text-caption">{{ r.note }}</p>
+            }
+          </td></ng-container
+        >
+        <ng-container matColumnDef="status"
+          ><th mat-header-cell *matHeaderCellDef class="text-caption">Status</th>
+          <td mat-cell *matCellDef="let r"><app-status-badge [status]="r.status" /></td
+        ></ng-container>
+        <ng-container matColumnDef="actions"
+          ><th mat-header-cell *matHeaderCellDef class="text-caption">Actions</th>
+          <td mat-cell *matCellDef="let r">
+            @if (roles.role() === 'fleet_manager' && r.status === 'pending') {
+              <button
+                mat-icon-button
+                matTooltip="Approve reservation"
+                data-testid="approve-reservation"
+                [disabled]="busy() !== null"
+                (click)="act(r, 'approve')"
+                [attr.aria-label]="'Approve reservation ' + r.id"
+              >
+                <span class="material-symbols-rounded" aria-hidden="true">check</span>
+              </button>
+              <button
+                mat-icon-button
+                [disabled]="busy() !== null"
+                matTooltip="Reject reservation"
+                data-testid="reject-reservation"
+                (click)="act(r, 'reject')"
+                [attr.aria-label]="'Reject reservation ' + r.id"
+              >
+                <span class="material-symbols-rounded" aria-hidden="true">close</span>
+              </button>
+            }
+            @if (canCancel(r)) {
+              <button
+                mat-icon-button
+                [disabled]="busy() !== null"
+                matTooltip="Cancel reservation"
+                data-testid="cancel-reservation"
+                (click)="act(r, 'cancel')"
+                [attr.aria-label]="'Cancel reservation ' + r.id"
+              >
+                <span class="material-symbols-rounded" aria-hidden="true">cancel</span>
+              </button>
+            }
+          </td></ng-container
+        >
+        <tr mat-header-row *matHeaderRowDef="columns"></tr>
+        <tr mat-row *matRowDef="let row; columns: columns"></tr>
+      </table>
+    </div>
+    @if (filtered().length > 20) {
+      <mat-paginator
+        [length]="filtered().length"
+        [pageSize]="pageSize()"
+        [pageIndex]="pageIndex()"
+        [pageSizeOptions]="[20, 50]"
+        (page)="pageIndex.set($event.pageIndex); pageSize.set($event.pageSize)"
+      />
+    }
+  }
+</section>
