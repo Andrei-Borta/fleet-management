@@ -37,3 +37,8 @@
   cost reporting. Remove a site only when no reservations reference it.
 - A site's dates cannot be changed to exclude an approved reservation (409). A reservation outside
   the site dates is rejected on creation (422) and on approval, if the site has changed since (409).
+- `GET /dashboard/fleet?from=&to=` returns availability and utilization for an inclusive period
+  (`422` when `to` is before `from`). `by_status` has every status, including zeroes; `by_type` is
+  ordered by count. Utilization is approved reservation days / period days, clipping reservations to
+  the period and merging overlaps. Retired equipment is counted in `by_status`/`by_type` but left out
+  of `utilization`, `top_used` and `least_used`; the rankings return at most five items.
