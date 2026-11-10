@@ -9,6 +9,11 @@
 - A reservation `409` caused by a booking or blocked equipment also has `"conflicts"`, a list of
   `{kind, id, start_date, end_date, status}`. `kind` is `reservation` or `maintenance`; `end_date`
   is `null` for maintenance in progress. It is empty when the equipment itself is blocked.
+- `"alternatives"` in `409` lists other equipment of the same type that can be reserved for
+  the period, as `{id, name, type, status, hourly_cost}`, cheapest first (ties by `id`). It skips
+  defective, in service or retired equipment and anything booked or in maintenance then. It may be empty.
+- `GET /reservations/alternatives?equipment_id=&start=&end=` returns the same list on demand. All three
+  are required and the dates are inclusive (`422` when `end` is before `start`, `404` for unknown equipment).
 - Role: header `X-Role: site_manager | fleet_manager | mechanic | operator` (default `fleet_manager`).
 - Money: `Decimal` serialized as a number with 2 decimals. Currency: RON.
 - Frontend models mirror the response schemas in `features/<x>/<x>.models.ts`. Check them against
@@ -30,7 +35,7 @@
 - `GET /reservations/calendar?from=&to=&site_id=&equipment_id=` feeds the central calendar. `from` and
   `to` are required, inclusive ISO dates, at most 93 days apart (`422` otherwise, also when `to` is
   before `from`). It returns events `{type, id, equipment: {id, name, type}, site: {id, name} | null,
-  start, end, status}`, ordered by `start`. `type` is `reservation` (pending and approved only) or
+start, end, status}`, ordered by `start`. `type` is `reservation` (pending and approved only) or
   `maintenance` (planned, in progress or done); `id` is the reservation or intervention id. Maintenance
   has no site and `end` is `null` while in progress. Filtering by `site_id` returns reservations only.
 - Sites with any reservations cannot be deleted (409), preserving reservation history and site
