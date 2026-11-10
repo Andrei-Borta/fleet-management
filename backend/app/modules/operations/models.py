@@ -16,9 +16,7 @@ class UsageLog(Base):
     equipment_id: Mapped[int] = mapped_column(
         ForeignKey("equipment.id", ondelete="CASCADE"), nullable=False
     )
-    site_id: Mapped[int] = mapped_column(
-        ForeignKey("sites.id", ondelete="CASCADE"), nullable=False
-    )
+    site_id: Mapped[int] = mapped_column(ForeignKey("sites.id", ondelete="CASCADE"), nullable=False)
     date: Mapped[date] = mapped_column(Date, nullable=False)
     hours: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     fuel_liters: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
