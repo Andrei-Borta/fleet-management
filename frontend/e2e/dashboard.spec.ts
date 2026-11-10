@@ -392,6 +392,7 @@ test('shows loading and retries a failed request', async ({ page }) => {
 for (const width of [375, 1440]) {
   test(`fleet cards fit at ${width}px in light and dark mode`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.route('**/api/v1/dashboard/fleet?*', (route) => route.fulfill({ json: fleet }));
     await page.goto('/dashboard');
     await expect(page.getByTestId('fleet-kpis')).toBeVisible();
@@ -417,6 +418,7 @@ for (const width of [375, 1440]) {
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
         width,
       );
+      await page.screenshot({ path: `test-results/dashboard-${width}-${theme}.png`, fullPage: true });
     }
   });
 }
