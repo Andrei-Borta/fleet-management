@@ -28,6 +28,7 @@ from app.modules.maintenance.rules import (
     is_service_due,
 )
 from app.modules.maintenance.schemas import (
+    DefectCreate,
     DueEquipmentRead,
     InterventionCreate,
     InterventionRead,
@@ -90,6 +91,36 @@ def recompute_status(db: Session, equipment_id: int) -> Equipment:
         equipment.status = EquipmentStatus.AVAILABLE
     db.flush()
     return equipment
+
+
+def list_defects(
+    db: Session, equipment_id: int | None = None, open_only: bool | None = None
+) -> list[Defect]:
+    """List defects, optionally for one machine and only open (True) or resolved (False)."""
+    query = select(Defect).order_by(Defect.id)
+    if equipment_id is not None:
+        query = query.where(Defect.equipment_id == equipment_id)
+    if open_only is not None:
+        wanted = DefectStatus.OPEN if open_only else DefectStatus.RESOLVED
+        query = query.where(Defect.status == wanted)
+    return list(db.scalars(query).all())
+
+
+def report_defect(db: Session, data: DefectCreate) -> Defect:
+    """Record an open defect, then recompute status in the same transaction.
+
+    ``recompute_status`` locks the equipment row and flushes, but does not commit. An open
+    critical defect blocks the machine unless it is retired or already in service.
+    """
+    get_equipment(db, data.equipment_id, for_update=True)
+    defect = Defect(**data.model_dump())
+    db.add(defect)
+    # autoflush is off, so the new row must be visible before status is recomputed.
+    db.flush()
+    recompute_status(db, data.equipment_id)
+    db.commit()
+    db.refresh(defect)
+    return defect
 
 
 def list_due_equipment(

@@ -7,6 +7,8 @@ from app.core.deps import DbSession
 from app.modules.maintenance import service
 from app.modules.maintenance.models import InterventionStatus
 from app.modules.maintenance.schemas import (
+    DefectCreate,
+    DefectRead,
     DueEquipmentRead,
     InterventionCreate,
     InterventionRead,
@@ -25,6 +27,21 @@ def list_due(
     within_hours: Annotated[Decimal, Query(ge=0)] = service.DEFAULT_WITHIN_HOURS,
 ) -> list[DueEquipmentRead]:
     return service.list_due_equipment(db, within_days, within_hours)
+
+
+@router.get("/defects", response_model=list[DefectRead])
+def list_defects(
+    db: DbSession,
+    equipment_id: int | None = None,
+    open_only: Annotated[bool | None, Query(alias="open")] = None,
+) -> list[DefectRead]:
+    defects = service.list_defects(db, equipment_id, open_only)
+    return [DefectRead.model_validate(item) for item in defects]
+
+
+@router.post("/defects", response_model=DefectRead, status_code=status.HTTP_201_CREATED)
+def report_defect(db: DbSession, data: DefectCreate) -> DefectRead:
+    return DefectRead.model_validate(service.report_defect(db, data))
 
 
 @router.get("/interventions", response_model=list[InterventionRead])

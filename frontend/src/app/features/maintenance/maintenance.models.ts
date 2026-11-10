@@ -1,4 +1,4 @@
-// Defects mirror the database model until the defect API schemas exist.
+// Defect types mirror the maintenance response schemas in backend/app/modules/maintenance/schemas.py.
 
 export type DefectSeverity = 'low' | 'medium' | 'critical';
 export type DefectStatus = 'open' | 'resolved';
@@ -12,6 +12,15 @@ export interface Defect {
   /** UTC ISO datetime. */
   reported_at: string;
   resolved_at: string | null;
+}
+
+/** Body of `POST /maintenance/defects`. Status is recomputed in that same request. */
+export type DefectCreate = Pick<Defect, 'equipment_id' | 'description' | 'severity'>;
+
+/** Query parameters of `GET /maintenance/defects`. `open`: true = open only, false = resolved only. */
+export interface DefectFilters {
+  equipment_id?: number;
+  open?: boolean;
 }
 
 export type InterventionKind = 'repair' | 'revision';

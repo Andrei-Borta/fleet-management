@@ -4,6 +4,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.errors import InvalidDataError, NotFoundError
@@ -19,6 +20,7 @@ from app.modules.maintenance.models import (
     InterventionStatus,
     ServiceIntervention,
 )
+from app.modules.maintenance.schemas import DefectCreate
 
 TYPE = "maint-test-excavator"
 TODAY = date(2026, 11, 10)
@@ -246,3 +248,107 @@ def test_list_due_rejects_negative_windows(db: Session) -> None:
         service.list_due_equipment(db, within_days=-1)
     with pytest.raises(InvalidDataError):
         service.list_due_equipment(db, within_hours=Decimal(-1))
+
+
+# --- defect reporting ---------------------------------------------------------------------
+
+
+def report(db: Session, equipment_id: int, severity: DefectSeverity, text: str = "Leaking hose"):
+    return service.report_defect(
+        db, DefectCreate(equipment_id=equipment_id, description=text, severity=severity)
+    )
+
+
+@pytest.mark.parametrize("severity", [DefectSeverity.LOW, DefectSeverity.MEDIUM])
+def test_minor_defect_is_recorded_without_blocking(db: Session, severity: DefectSeverity) -> None:
+    equipment = make_equipment(db, f"mnt-minor-{severity.value}")
+    defect = report(db, equipment.id, severity)
+    assert defect.id is not None
+    assert defect.equipment_id == equipment.id
+    assert defect.severity == severity
+    assert defect.status == DefectStatus.OPEN
+    assert defect.reported_at is not None
+    assert defect.resolved_at is None
+    db.refresh(equipment)
+    assert equipment.status == EquipmentStatus.AVAILABLE
+
+
+def test_minor_defect_leaves_an_open_critical_defect_blocking(db: Session) -> None:
+    equipment = make_equipment(db, "mnt-minor-keeps-critical")
+    add_defect(db, equipment.id, DefectSeverity.CRITICAL)
+    service.recompute_status(db, equipment.id)
+    report(db, equipment.id, DefectSeverity.LOW, "Small leak")
+    db.refresh(equipment)
+    assert equipment.status == EquipmentStatus.DEFECTIVE
+
+
+@pytest.mark.parametrize("status", [EquipmentStatus.AVAILABLE, EquipmentStatus.RESERVED])
+def test_critical_defect_blocks_equipment(db: Session, status: EquipmentStatus) -> None:
+    equipment = make_equipment(db, f"mnt-crit-{status.value}")
+    equipment.status = status
+    db.flush()
+    defect = report(db, equipment.id, DefectSeverity.CRITICAL, "Brake failure")
+    assert defect.severity == DefectSeverity.CRITICAL
+    db.refresh(equipment)
+    assert equipment.status == EquipmentStatus.DEFECTIVE
+
+
+def test_critical_defect_stays_in_service_while_an_intervention_is_running(db: Session) -> None:
+    equipment = make_equipment(db, "mnt-crit-in-service")
+    add_intervention(db, equipment.id, InterventionStatus.IN_PROGRESS)
+    report(db, equipment.id, DefectSeverity.CRITICAL)
+    db.refresh(equipment)
+    assert equipment.status == EquipmentStatus.IN_SERVICE
+
+
+def test_critical_defect_on_retired_equipment_does_not_change_status(db: Session) -> None:
+    equipment = make_equipment(db, "mnt-crit-retired", status=EquipmentStatus.RETIRED)
+    assert report(db, equipment.id, DefectSeverity.CRITICAL).status == DefectStatus.OPEN
+    db.refresh(equipment)
+    assert equipment.status == EquipmentStatus.RETIRED
+
+
+def test_report_defect_on_missing_equipment_raises_not_found(db: Session) -> None:
+    with pytest.raises(NotFoundError, match="Equipment not found"):
+        report(db, 99999999, DefectSeverity.CRITICAL)
+
+
+@pytest.mark.parametrize("description", ["", "   ", "x" * 2001])
+def test_defect_schema_rejects_invalid_description(description: str) -> None:
+    with pytest.raises(ValidationError):
+        DefectCreate(equipment_id=1, description=description, severity=DefectSeverity.LOW)
+
+
+def test_defect_schema_rejects_unknown_severity() -> None:
+    with pytest.raises(ValidationError):
+        DefectCreate(equipment_id=1, description="Noise", severity="catastrophic")  # type: ignore[arg-type]
+
+
+def test_list_defects_filters_by_equipment_and_open(db: Session) -> None:
+    first = make_equipment(db, "mnt-list-1")
+    second = make_equipment(db, "mnt-list-2")
+    a = report(db, first.id, DefectSeverity.LOW, "A")
+    b = report(db, first.id, DefectSeverity.MEDIUM, "B")
+    c = report(db, second.id, DefectSeverity.LOW, "C")
+    b.status = DefectStatus.RESOLVED
+    db.flush()
+
+    assert [item.id for item in service.list_defects(db, equipment_id=first.id)] == [a.id, b.id]
+    assert [item.id for item in service.list_defects(db, equipment_id=second.id)] == [c.id]
+    assert [
+        item.id for item in service.list_defects(db, equipment_id=first.id, open_only=True)
+    ] == [a.id]
+    assert [
+        item.id for item in service.list_defects(db, equipment_id=first.id, open_only=False)
+    ] == [b.id]
+    assert service.list_defects(db, equipment_id=99999999) == []
+
+
+def test_list_defects_without_filters_returns_all_ordered(db: Session) -> None:
+    equipment = make_equipment(db, "mnt-list-all")
+    a = report(db, equipment.id, DefectSeverity.LOW)
+    b = report(db, equipment.id, DefectSeverity.LOW)
+    ids = [item.id for item in service.list_defects(db)]
+    assert ids == sorted(ids)
+    assert a.id in ids
+    assert b.id in ids
