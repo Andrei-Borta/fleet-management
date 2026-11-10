@@ -3,7 +3,8 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Request, status
 from fastapi.responses import JSONResponse
 
-from app.core.deps import CurrentRole, DbSession
+from app.core.deps import CurrentRole, DbSession, Role
+from app.core.errors import ForbiddenError
 from app.modules.reservations import service
 from app.modules.reservations.models import ReservationStatus
 from app.modules.reservations.schemas import (
@@ -15,6 +16,14 @@ from app.modules.reservations.schemas import (
 router = APIRouter(prefix="/reservations", tags=["reservations"])
 
 CONFLICT_RESPONSE = {status.HTTP_409_CONFLICT: {"model": ReservationConflictBody}}
+CREATE_ROLES = {Role.SITE_MANAGER, Role.FLEET_MANAGER}
+DECISION_ROLES = {Role.FLEET_MANAGER}
+CANCEL_ROLES = {Role.SITE_MANAGER, Role.FLEET_MANAGER}
+
+
+def _require_role(role: Role, allowed: set[Role], action: str) -> None:
+    if role not in allowed:
+        raise ForbiddenError(f"Role '{role.value}' cannot {action} reservations")
 
 
 async def reservation_conflict_handler(
@@ -44,21 +53,25 @@ def list_reservations(
 def create_reservation(
     db: DbSession, role: CurrentRole, data: ReservationCreate
 ) -> ReservationRead:
+    _require_role(role, CREATE_ROLES, "create")
     return ReservationRead.model_validate(service.create_reservation(db, data, role))
 
 
 @router.post(
     "/{reservation_id}/approve", response_model=ReservationRead, responses=CONFLICT_RESPONSE
 )
-def approve_reservation(db: DbSession, reservation_id: int) -> ReservationRead:
+def approve_reservation(db: DbSession, role: CurrentRole, reservation_id: int) -> ReservationRead:
+    _require_role(role, DECISION_ROLES, "approve")
     return ReservationRead.model_validate(service.approve_reservation(db, reservation_id))
 
 
 @router.post("/{reservation_id}/reject", response_model=ReservationRead)
-def reject_reservation(db: DbSession, reservation_id: int) -> ReservationRead:
+def reject_reservation(db: DbSession, role: CurrentRole, reservation_id: int) -> ReservationRead:
+    _require_role(role, DECISION_ROLES, "reject")
     return ReservationRead.model_validate(service.reject_reservation(db, reservation_id))
 
 
 @router.post("/{reservation_id}/cancel", response_model=ReservationRead)
-def cancel_reservation(db: DbSession, reservation_id: int) -> ReservationRead:
+def cancel_reservation(db: DbSession, role: CurrentRole, reservation_id: int) -> ReservationRead:
+    _require_role(role, CANCEL_ROLES, "cancel")
     return ReservationRead.model_validate(service.cancel_reservation(db, reservation_id))
