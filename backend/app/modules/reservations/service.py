@@ -12,6 +12,7 @@ from app.core.deps import Role
 from app.core.errors import ConflictError, InvalidDataError, NotFoundError
 from app.modules.equipment.models import Equipment, EquipmentStatus
 from app.modules.maintenance.models import InterventionStatus, ServiceIntervention
+from app.modules.maintenance.rules import is_service_due
 from app.modules.reservations.models import Reservation, ReservationStatus
 from app.modules.reservations.schemas import (
     AlternativeRead,
@@ -166,7 +167,11 @@ def find_alternatives(db: Session, equipment_id: int, start: date, end: date) ->
         )
         .order_by(Equipment.hourly_cost, Equipment.id)
     ).all()
-    return [c for c in candidates if not find_conflicts(db, c.id, start, end)]
+    return [
+        c
+        for c in candidates
+        if not is_service_due(c, start) and not find_conflicts(db, c.id, start, end)
+    ]
 
 
 def ensure_reservable(db: Session, equipment_id: int, start: date, end: date) -> None:
@@ -181,6 +186,12 @@ def ensure_reservable(db: Session, equipment_id: int, start: date, end: date) ->
     if equipment.status in BLOCKED_STATUSES:
         raise ReservationConflictError(
             f"Equipment is {equipment.status.value} and cannot be reserved",
+            [],
+            _alternatives_for(db, equipment_id, start, end),
+        )
+    if is_service_due(equipment, start):
+        raise ReservationConflictError(
+            f"Equipment '{equipment.name}' is overdue for service and cannot be reserved",
             [],
             _alternatives_for(db, equipment_id, start, end),
         )
