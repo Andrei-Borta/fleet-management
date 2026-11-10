@@ -37,3 +37,12 @@
   cost reporting. Remove a site only when no reservations reference it.
 - A site's dates cannot be changed to exclude an approved reservation (409). A reservation outside
   the site dates is rejected on creation (422) and on approval, if the site has changed since (409).
+- Maintenance interventions: `GET/POST /maintenance/interventions`, `GET/PATCH
+  /maintenance/interventions/{id}`, and `POST /maintenance/interventions/{id}/parts`. Lists accept
+  `equipment_id` and `status` filters. Create uses equipment, optional defect, kind, scheduled date,
+  optional description, labour hours and rate. Status progresses `planned` → `in_progress` → `done`;
+  completed interventions cannot be changed. Part creation returns the updated intervention with
+  parts and total cost (parts plus labour hours × rate, rounded to two decimals). A planned job may
+  not overlap an approved reservation. An intervention cannot start before its scheduled date, and
+  starting it is rejected if the open-ended work would overlap an approved reservation. Closing a
+  revision records the equipment's service readings.
