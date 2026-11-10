@@ -25,7 +25,7 @@ export interface CalendarEvent {
   /** ISO date; `null` for maintenance in progress. */
   end: string | null;
   /** Reservation: `pending` or `approved`. Maintenance: `planned`, `in_progress` or `done`. */
-  status: string;
+  status: 'pending' | 'approved' | 'planned' | 'in_progress' | 'done';
 }
 
 /** Query parameters of `GET /reservations/calendar`. The range is at most 93 days (inclusive). */

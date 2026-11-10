@@ -1,0 +1,133 @@
+<app-page-header title="Calendar" subtitle="Bookings and maintenance across the fleet" />
+<section class="filters-bar">
+  <mat-form-field appearance="outline"
+    ><mat-label>View</mat-label
+    ><mat-select [ngModel]="mode()" (ngModelChange)="mode.set($event); load()"
+      ><mat-option value="week">Week</mat-option
+      ><mat-option value="month">Month</mat-option></mat-select
+    ></mat-form-field
+  >
+  <mat-form-field appearance="outline"
+    ><mat-label>Site</mat-label
+    ><mat-select
+      [canSelectNullableOptions]="true"
+      [ngModel]="site()"
+      (ngModelChange)="site.set($event); load()"
+      ><mat-option [value]="null">All sites</mat-option>
+      @for (s of sites(); track s.id) {
+        <mat-option [value]="s.id">{{ s.name }}</mat-option>
+      }
+    </mat-select></mat-form-field
+  >
+  <mat-form-field appearance="outline"
+    ><mat-label>Equipment type</mat-label
+    ><mat-select [ngModel]="type()" (ngModelChange)="type.set($event); pageIndex.set(0)"
+      ><mat-option value="">All types</mat-option>
+      @for (t of types(); track t) {
+        <mat-option [value]="t">{{ t }}</mat-option>
+      }
+    </mat-select></mat-form-field
+  >
+  <button mat-stroked-button (click)="navigate(-1)" aria-label="Previous period">Previous</button>
+  <button mat-stroked-button (click)="today()">Today</button>
+  <button mat-stroked-button (click)="navigate(1)" aria-label="Next period">Next</button>
+</section>
+<section class="card" [attr.aria-busy]="loading()">
+  @if (loading()) {
+    <mat-progress-bar data-testid="page-loading" mode="indeterminate" />
+  }
+  <h2 aria-live="polite">
+    {{ days()[0] | date: 'dd MMM yyyy' }} – {{ days().at(-1) | date: 'dd MMM yyyy' }}
+  </h2>
+  <p class="text-caption">
+    Reservation: solid edge · Maintenance: dashed edge. Select an event for details.
+  </p>
+  @if (site() !== null) {
+    <p class="text-caption">
+      Maintenance belongs to equipment and is excluded when filtering by site.
+    </p>
+  }
+  @if (failed()) {
+    <div class="empty-state">
+      <p>Calendar could not be loaded.</p>
+      <button mat-stroked-button (click)="load()">Retry</button>
+    </div>
+  } @else if (!loading()) {
+    @if (!hasEvents()) {
+      <div class="empty-state">
+        <span class="material-symbols-rounded" aria-hidden="true">event_available</span>
+        <p>No bookings or maintenance match this period and filters.</p>
+      </div>
+      @if (rows().length > 20) {
+        <mat-paginator
+          [length]="rows().length"
+          [pageIndex]="pageIndex()"
+          [pageSize]="pageSize()"
+          [pageSizeOptions]="[20, 50]"
+          (page)="pageIndex.set($event.pageIndex); pageSize.set($event.pageSize)"
+        />
+      }
+    }
+    @if (rows().length > 0) {
+      <div
+        class="timeline"
+        tabindex="0"
+        role="region"
+        aria-label="Fleet timeline, scroll horizontally for more dates"
+      >
+        <table mat-table [dataSource]="visibleRows()">
+          <caption class="text-caption">
+            {{
+              mode() === 'week' ? 'Weekly' : 'Monthly'
+            }}
+            equipment schedule
+          </caption>
+          <ng-container matColumnDef="equipment" sticky>
+            <th mat-header-cell *matHeaderCellDef class="text-caption">Equipment</th>
+            <th mat-cell *matCellDef="let e" scope="row">
+              {{ e.name }}<span class="text-caption">{{ e.type }}</span>
+            </th>
+          </ng-container>
+          @for (day of days(); track day) {
+            <ng-container [matColumnDef]="day">
+              <th mat-header-cell *matHeaderCellDef class="text-caption">
+                {{ day | date: 'EEE dd' }}
+              </th>
+              <td mat-cell *matCellDef="let e">
+                @for (event of onDay(e.id, day); track event.type + event.id) {
+                  <button
+                    class="event"
+                    data-testid="calendar-event"
+                    [class.maintenance]="event.type === 'maintenance'"
+                    (click)="open(event)"
+                    [attr.aria-label]="
+                      event.type + ' ' + event.id + ' for ' + e.name + ' on ' + day
+                    "
+                  >
+                    <span>{{
+                      event.type === 'reservation'
+                        ? (event.site?.name ?? 'Reservation')
+                        : 'Maintenance'
+                    }}</span>
+                    <app-status-badge [status]="status(event)" />
+                  </button>
+                }
+              </td>
+            </ng-container>
+          }
+          <tr mat-header-row *matHeaderRowDef="columns()"></tr>
+          <tr mat-row *matRowDef="let row; columns: columns()"></tr>
+        </table>
+      </div>
+      @if (rows().length > 20) {
+        <mat-paginator
+          [length]="rows().length"
+          [pageIndex]="pageIndex()"
+          [pageSize]="pageSize()"
+          [pageSizeOptions]="[20, 50]"
+          (page)="pageIndex.set($event.pageIndex); pageSize.set($event.pageSize)"
+        />
+      }
+    }
+  }
+</section>
