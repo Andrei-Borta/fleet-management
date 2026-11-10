@@ -51,6 +51,9 @@ Small, focused commits. They are squashed on merge anyway, so the **PR title** i
 AI agents (Claude Code, Codex, Copilot, …) are encouraged. Rules:
 - Agents follow [AGENTS.md](AGENTS.md).
 - **You** are the author and are responsible for the code. Read every line before you push.
+- **No bot-authored PRs or commits.** Don't use cloud agents that open PRs or push commits under their own
+  account (e.g. the GitHub Copilot coding agent, `copilot-swe-agent[bot]`). Run agents locally and commit
+  and push under your own name. Bot-authored PRs are closed without review.
 - **No AI attribution** anywhere: no `Co-Authored-By:` trailers for AI tools, no "Generated with …"
   lines in commits, PRs, issues or code comments. AI tools must never show up as repository contributors.
 - Never paste secrets into prompts.

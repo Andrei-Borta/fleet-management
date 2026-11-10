@@ -49,7 +49,9 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). In short:
 4. **Contract first**: if you change an API schema, update the matching frontend models and
    `docs/API_CONVENTIONS.md` if a convention changes.
 5. **DB changes** always come with an Alembic migration. Never edit a migration that is already merged.
-6. **No AI attribution, ever.** Do not add `Co-Authored-By:` trailers for AI tools, "Generated with …"
+6. **Commits and PRs belong to the human developer.** Never open PRs or push commits from a bot account
+   (e.g. the GitHub Copilot coding agent). Work locally; the developer commits, pushes and opens the PR.
+   **No AI attribution, ever.** Do not add `Co-Authored-By:` trailers for AI tools, "Generated with …"
    footers, or AI mentions in commits, PR descriptions, issues or code comments. Commits are authored by the human
    developer only. AI tools must never appear as GitHub contributors.
 7. **Git workflow** ([CONTRIBUTING.md](CONTRIBUTING.md)): branch `<type>/<issue#>-slug` from `main`,
