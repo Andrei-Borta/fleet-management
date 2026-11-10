@@ -1,5 +1,4 @@
-// Mirrors backend/app/modules/maintenance/models.py until the maintenance API schemas exist.
-// Update this file to match the response schemas when they land (docs/API_CONVENTIONS.md).
+// Defects mirror the database model until the defect API schemas exist.
 
 export type DefectSeverity = 'low' | 'medium' | 'critical';
 export type DefectStatus = 'open' | 'resolved';
@@ -33,7 +32,28 @@ export interface Intervention {
   labor_hours: number;
   /** RON per labour hour. */
   labor_rate: number;
+  parts: InterventionPart[];
+  /** Parts and labour cost in RON, rounded to two decimals. */
+  total_cost: number;
 }
+
+export interface InterventionCreate {
+  equipment_id: number;
+  defect_id?: number | null;
+  description?: string;
+  kind: InterventionKind;
+  scheduled_date: string;
+  labor_hours?: number;
+  labor_rate?: number;
+}
+
+export interface InterventionUpdate {
+  status?: InterventionStatus;
+  labor_hours?: number;
+  labor_rate?: number;
+}
+
+export type InterventionPartCreate = Pick<InterventionPart, 'name' | 'qty' | 'unit_cost'>;
 
 export interface InterventionPart {
   id: number;
