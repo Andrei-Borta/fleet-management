@@ -15,8 +15,9 @@ mechanic repairs it, and the dashboard shows what all of this cost.
 | 4:15–4:45 | Fleet manager | 7. Site costs: the repair pushes Pipera further over budget |
 | 4:45–5:00 | – | 8. Wrap-up |
 
-About 420 words of narration (about 3:30 read calmly), leaving time for the clicks. Every number below
-comes from a dry run on a fresh seed
+The video has **no voice-over**: each scene has timed subtitles (35 cues, at most two lines of about
+40 characters, 5–10 s each). The same cues are in [`demo-subtitles.srt`](demo-subtitles.srt), ready to
+import into the video editor. Every number below comes from a dry run on a fresh seed
 (see [Dry run](#dry-run)).
 
 ---
@@ -36,23 +37,32 @@ comes from a dry run on a fresh seed
    hidden. Open the app once and set the role to **Fleet manager** so it starts on the dashboard.
 4. **Do not touch the data before recording.** Each scene relies on what the previous one created.
    To retake from the start, reseed.
-5. **Recording.** 1080p, system sounds off. Record each scene as its own clip; cut on the role switch.
+5. **Recording.** 1080p, no audio needed. Record each scene as its own clip; cut on the role switch.
+6. **Subtitles.** Import `docs/demo-subtitles.srt`, then nudge each cue to the moment its click happens.
+   Keep each cue on screen long enough to read twice, and leave the bottom ~15% of the frame free of
+   important UI (the subtitles sit there).
 
 ---
 
 ## Storyboard
 
 Each scene lists the click path (**bold** = what you click or type), what must be on screen, and the
-narration. Keep the mouse still while the narration explains a screen.
+subtitles with their times. Move the mouse slowly and pause on each result for the length of its
+subtitle, so viewers can read it and see the screen.
 
 ### 1. The problem (0:00–0:25)
 
 **Screen:** title card "Fleet Management", then the dashboard with no clicks.
 
-> Construction companies juggle dozens of machines across many sites. Machines get double-booked, a
-> broken loader keeps working until someone notices, and nobody knows what a site really costs until
-> the invoices arrive. Fleet Management puts equipment, bookings, repairs and costs in one place,
-> with a view for each role.
+**Subtitles**
+
+| Time | Subtitle |
+|---|---|
+| 0:00–0:05 | Construction fleets: dozens of machines / across many sites |
+| 0:05–0:10 | Machines get double-booked |
+| 0:10–0:15 | Broken machines keep working / until someone notices |
+| 0:15–0:20 | Site costs stay invisible / until the invoices arrive |
+| 0:20–0:25 | Fleet Management: one place for equipment, / bookings, repairs and costs |
 
 ### 2. Fleet manager: overview and a new excavator (0:25–1:05)
 
@@ -67,10 +77,15 @@ narration. Keep the mouse still while the narration explains a screen.
 lists **CAT D8 Bulldozer** and **Volvo EC220E Excavator** as *Overdue*. After saving, the new excavator
 is listed as *Available*.
 
-> The fleet manager starts on the dashboard: twenty machines, which ones are reserved, in service or
-> broken, and how much each one is used. Two machines are overdue for service, and the bell has
-> already flagged them: overdue machines can't be booked until they're serviced. Today a new
-> excavator arrives, so it goes into the fleet.
+**Subtitles**
+
+| Time | Subtitle |
+|---|---|
+| 0:25–0:31 | Fleet manager: the whole fleet at a glance |
+| 0:31–0:37 | Available, reserved, in service, defective |
+| 0:37–0:43 | Two machines are overdue for service. / They can't be booked until serviced. |
+| 0:43–0:48 | The bell already flagged them |
+| 0:48–1:05 | A new excavator arrives: / CAT 323 joins the fleet |
 
 ### 3. Site manager: request, conflict, alternative (1:05–2:00)
 
@@ -85,10 +100,16 @@ is listed as *Available*.
 equipment is reserved from T-1 to T+9". Alternatives: **JCB 220X**, **Hitachi ZX210**, **CAT 323**.
 After *Request this*: "Request sent" and the reservations list.
 
-> The site manager at North Ring Road needs an excavator next week. The CAT 320 is the first choice, but it's
-> still booked until the ninth. Instead of a phone call, the app shows the overlapping booking and
-> suggests free excavators of the same type for exactly those dates, including the one that just
-> arrived. One click, and the request goes to the fleet manager.
+**Subtitles**
+
+| Time | Subtitle |
+|---|---|
+| 1:05–1:12 | Site manager at North Ring Road / needs an excavator next week |
+| 1:12–1:22 | Reserve equipment from the site page |
+| 1:22–1:32 | First choice: the CAT 320 |
+| 1:32–1:42 | Conflict: it's booked until then. / The app shows the overlapping booking. |
+| 1:42–1:52 | Free excavators of the same type / for exactly those dates |
+| 1:52–2:00 | Including the new CAT 323. / One click sends the request. |
 
 ### 4. Fleet manager: approvals and the calendar (2:00–2:40)
 
@@ -104,9 +125,15 @@ After *Request this*: "Request sent" and the reservations list.
 maintenance for this period". The calendar shows CAT 323 at North Ring Road from T+7 to T+11. The site
 manager's bell shows *Reservation approved* and *Reservation rejected*.
 
-> Requests land in the fleet manager's inbox. Approving re-checks the fleet, so an older request for
-> the same CAT 320 is refused with the reason, so it gets rejected. The booking appears on the central
-> calendar next to maintenance, and the site manager is notified straight away.
+**Subtitles**
+
+| Time | Subtitle |
+|---|---|
+| 2:00–2:08 | Fleet manager: the approvals inbox |
+| 2:08–2:16 | Approving re-checks the fleet |
+| 2:16–2:24 | An older CAT 320 request now conflicts, / so it is rejected |
+| 2:24–2:32 | The booking is on the central calendar, / next to maintenance |
+| 2:32–2:40 | The site manager is notified right away |
 
 ### 5. Operator: safety checklist and auto-block (2:40–3:20)
 
@@ -121,9 +148,14 @@ manager's bell shows *Reservation approved* and *Reservation rejected*.
 a critical item has failed: Brakes." After submitting: "Checklist submitted. Equipment is blocked." The
 loader's page shows *Defective*.
 
-> Before every shift the operator runs a safety check. The brakes on the loader at Pipera Business Park
-> fail. That's a critical item, so the app says not to operate it, records a critical defect, and
-> blocks the machine. From this moment nobody can book it.
+**Subtitles**
+
+| Time | Subtitle |
+|---|---|
+| 2:40–2:48 | Operator: daily safety check before the shift |
+| 2:48–2:58 | The loader's brakes fail. / That's a critical item. |
+| 2:58–3:08 | The app warns: do not operate this machine |
+| 3:08–3:20 | A critical defect is recorded / and the loader is blocked automatically |
 
 ### 6. Mechanic: repair with parts and labour (3:20–4:15)
 
@@ -139,9 +171,15 @@ loader's page shows *Defective*.
 **On screen:** the total reads **1.150,00 RON** (700 parts + 450 labour). After *Complete* the card is in
 **Done** and the defect is gone from *Open defects*.
 
-> The mechanic is notified of the defect, plans the repair from it and starts it, which puts the loader
-> in service, then logs the brake pads and three hours of labour. Completing the job resolves the defect,
-> and the loader is available again, automatically.
+**Subtitles**
+
+| Time | Subtitle |
+|---|---|
+| 3:20–3:28 | Mechanic: notified of the new defect |
+| 3:28–3:38 | Plan the repair, then start it. / The loader is now in service. |
+| 3:38–3:52 | Log parts and labour: / 2 brake pad sets, 3 hours |
+| 3:52–4:02 | Total repair cost: 1.150 RON |
+| 4:02–4:15 | Complete: the defect is resolved / and the loader is available again |
 
 ### 7. Fleet manager: costs against budget (4:15–4:45)
 
@@ -153,17 +191,24 @@ loader's page shows *Defective*.
 1.150 RON repair under maintenance in the breakdown. Dambovita Bridge at **90%**. North Ring Road now
 includes the CAT 323 booking.
 
-> And the money. Every booking and every repair is charged to the site that had the machine. The brake
-> repair goes to Pipera Business Park, which was already over budget and is now at a hundred and
-> eighteen percent, so the fleet manager sees it today, not at the end of the month.
+**Subtitles**
+
+| Time | Subtitle |
+|---|---|
+| 4:15–4:23 | Fleet manager: site costs against budget |
+| 4:23–4:33 | Bookings and repairs are charged / to the site that had the machine |
+| 4:33–4:45 | Pipera Business Park: 112% → 118%, / visible today, not at month end |
 
 ### 8. Wrap-up (4:45–5:00)
 
 **Screen:** the dashboard, then the closing card with the team names.
 
-> One place for the fleet: no double bookings, broken machines blocked the moment they fail, and
-> costs visible per site. Next steps: user accounts with real permissions, and GPS tracking of the
-> machines.
+**Subtitles**
+
+| Time | Subtitle |
+|---|---|
+| 4:45–4:52 | No double bookings. Broken machines blocked. / Costs visible per site. |
+| 4:52–5:00 | Next: user accounts with real permissions / and GPS tracking |
 
 ---
 
@@ -208,5 +253,5 @@ Run on 11 Nov 2026 on a fresh seed, every scene in order:
 - Through the UI: the same flow is covered by the Playwright specs `demo-flow`, `reservation-form`,
   `operations-checklist`, `maintenance-board`, `notifications` and `costs`, which pass on `main`.
 
-Do one full rehearsal with the team on the recorded build before the final take, reading the narration
-aloud against the timings.
+Do one full rehearsal with the team on the recorded build before the final take, checking each scene's
+clicks fit inside its subtitle timings.
