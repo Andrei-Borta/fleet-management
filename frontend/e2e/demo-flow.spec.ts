@@ -157,7 +157,8 @@ test('demo storyline: request, conflict, approval, defect, repair and costs', as
     });
     expect(blocked.status()).toBe(409);
 
-    // Scene 4, mechanic: repair with parts and labour, then close the intervention (API until #27).
+    // Scene 4, mechanic: repair with parts and labour, then close it. Done through the API because
+    // the board plans repairs for today, and the cost must fall on the 2027 booking checked below.
     const mechanic = { 'X-Role': 'mechanic' };
     const interventionResponse = await request.post(`${API}/maintenance/interventions`, {
       headers: mechanic,
