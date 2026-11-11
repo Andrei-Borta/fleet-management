@@ -53,7 +53,6 @@ export class OperationsPage {
   protected readonly loading = signal(false);
   protected readonly failed = signal(false);
   protected readonly saving = signal(false);
-  protected readonly submitFailed = signal(false);
   protected readonly selectedEquipmentId = signal<number | null>(null);
   protected readonly checklistDate = signal(localDate());
   protected readonly items = signal(CHECKLIST_ITEMS.map((item) => ({ ...item })));
@@ -92,6 +91,13 @@ export class OperationsPage {
       });
   }
 
+  /** A new machine starts a new checklist, so earlier answers never carry over. */
+  protected selectEquipment(id: number): void {
+    this.selectedEquipmentId.set(id);
+    this.items.set(CHECKLIST_ITEMS.map((item) => ({ ...item })));
+    this.submitted.set(null);
+  }
+
   protected setAnswer(id: string, ok: boolean): void {
     this.items.update((items) => items.map((item) => (item.id === id ? { ...item, ok } : item)));
     this.submitted.set(null);
@@ -116,7 +122,6 @@ export class OperationsPage {
       items: this.items().map(({ name, ok, critical }) => ({ name, ok: ok === true, critical })),
     };
     this.saving.set(true);
-    this.submitFailed.set(false);
     this.service
       .createChecklist(payload)
       .pipe(
@@ -128,7 +133,8 @@ export class OperationsPage {
           this.submitted.set(checklist);
           this.notifications.success('Safety checklist submitted');
         },
-        error: () => this.submitFailed.set(true),
+        // The error interceptor already reports the failure; the answers stay for a retry.
+        error: () => undefined,
       });
   }
 }

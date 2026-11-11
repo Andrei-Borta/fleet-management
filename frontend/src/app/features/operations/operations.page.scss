@@ -1,5 +1,5 @@
 .checklist-card {
-  max-width: 860px;
+  max-width: calc(var(--space-8) * 18);
   margin: 0 auto;
 }
 
@@ -67,7 +67,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 44px;
+  min-height: calc(var(--space-7) + var(--space-1));
   cursor: pointer;
 }
 
@@ -114,7 +114,6 @@
   color: var(--color-text-muted);
 }
 
-.submit-error,
 .error-state {
   color: var(--color-danger);
 }

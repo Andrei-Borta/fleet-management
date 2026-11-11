@@ -119,3 +119,62 @@ test('checklist remains usable on a narrow screen in dark mode', async ({ page }
   await expect(page.getByTestId('check-item-brakes')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
 });
+
+test('choosing another machine starts a fresh checklist', async ({ page }) => {
+  const other = { ...equipment, id: 13, name: 'Crane', serial_no: 'CR-13' };
+  await page.route('**/api/v1/equipment', (route) => route.fulfill({ json: [equipment, other] }));
+  await page.route(checklistPath, (route) =>
+    route.fulfill({
+      status: 201,
+      json: { id: 3, equipment_id: 12, date: '2026-11-11', items: [] },
+    }),
+  );
+
+  await page.goto('/operations');
+  await page.getByRole('combobox', { name: 'Equipment' }).click();
+  await page.getByRole('option', { name: 'Loader (LD-12)', exact: true }).click();
+  for (const id of ['brakes', 'lights', 'leaks', 'tires', 'horn', 'mirrors']) {
+    await page
+      .getByTestId(`check-item-${id}`)
+      .getByRole('radio', { name: 'OK', exact: true })
+      .check();
+  }
+  await page.getByTestId('submit-checklist').click();
+  await expect(page.getByTestId('checklist-result')).toBeVisible();
+
+  await page.getByRole('combobox', { name: 'Equipment' }).click();
+  await page.getByRole('option', { name: 'Crane (CR-13)', exact: true }).click();
+
+  await expect(page.getByTestId('checklist-result')).toHaveCount(0);
+  await expect(
+    page.getByTestId('check-item-brakes').getByRole('radio', { name: 'OK', exact: true }),
+  ).not.toBeChecked();
+  await expect(page.getByTestId('submit-checklist')).toBeDisabled();
+});
+
+test('a failed submission keeps the answers and shows only the interceptor message', async ({
+  page,
+}) => {
+  await page.route('**/api/v1/equipment', (route) => route.fulfill({ json: [equipment] }));
+  await page.route(checklistPath, (route) =>
+    route.fulfill({ status: 500, json: { detail: 'Database unavailable' } }),
+  );
+
+  await page.goto('/operations');
+  await page.getByRole('combobox', { name: 'Equipment' }).click();
+  await page.getByRole('option', { name: 'Loader (LD-12)', exact: true }).click();
+  for (const id of ['brakes', 'lights', 'leaks', 'tires', 'horn', 'mirrors']) {
+    await page
+      .getByTestId(`check-item-${id}`)
+      .getByRole('radio', { name: 'OK', exact: true })
+      .check();
+  }
+  await page.getByTestId('submit-checklist').click();
+
+  await expect(page.getByText('Database unavailable')).toHaveCount(1);
+  await expect(page.getByTestId('checklist-result')).toHaveCount(0);
+  await expect(
+    page.getByTestId('check-item-brakes').getByRole('radio', { name: 'OK', exact: true }),
+  ).toBeChecked();
+  await expect(page.getByTestId('submit-checklist')).toBeEnabled();
+});

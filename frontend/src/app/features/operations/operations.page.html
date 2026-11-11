@@ -22,7 +22,7 @@
         <mat-label>Equipment</mat-label>
         <mat-select
           [value]="selectedEquipmentId()"
-          (selectionChange)="selectedEquipmentId.set($event.value); submitted.set(null)"
+          (selectionChange)="selectEquipment($event.value)"
           data-testid="checklist-equipment"
           required
         >
@@ -106,12 +106,6 @@
           <strong>Checklist submitted. Equipment passed today’s safety check.</strong>
         }
       </div>
-    }
-
-    @if (submitFailed()) {
-      <p class="submit-error" role="alert">
-        The checklist was not saved. Your answers are still here; try again.
-      </p>
     }
 
     <div class="form-actions">
