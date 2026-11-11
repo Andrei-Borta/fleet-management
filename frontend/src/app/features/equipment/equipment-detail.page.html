@@ -1,7 +1,9 @@
 <app-page-header [title]="equipment()?.name || 'Equipment details'">
   <a mat-button routerLink="/equipment">Back to equipment</a>
-  @if (equipment()) {
+  @if (equipment() && roles.canVisit('/maintenance/report')) {
     <a mat-stroked-button routerLink="/maintenance/report" [queryParams]="{ equipment: id }">Report defect</a>
+  }
+  @if (equipment() && roles.can('equipment.manage')) {
     <a mat-flat-button [routerLink]="['/equipment', id, 'edit']">Edit equipment</a>
   }
 </app-page-header>

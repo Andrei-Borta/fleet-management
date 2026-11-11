@@ -8,6 +8,7 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
+import { RoleService } from '../../core/role.service';
 import { PageHeader } from '../../shared/page-header/page-header';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
 import { Intervention } from '../maintenance/maintenance.models';
@@ -59,6 +60,7 @@ import { EquipmentService } from './equipment.service';
 })
 export class EquipmentDetailPage {
   private readonly service = inject(EquipmentService);
+  protected readonly roles = inject(RoleService);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id')!;
   protected readonly hasSiteDetails = inject(Router).config.some(

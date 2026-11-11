@@ -35,7 +35,7 @@ test('real API: requests an alternative after a booking conflict', async ({ page
     await page.getByLabel('Start date').fill('2099-11-12');
     await page.getByLabel('End date').fill('2099-11-14');
     await page.getByRole('combobox', { name: 'Equipment', exact: true }).click();
-    const booked = page.getByRole('dialog', { name: 'Choose equipment' }).getByRole('button', { name: `${unique}-booked (${unique}) Reserved` });
+    const booked = page.getByRole('dialog', { name: 'Choose equipment' }).getByRole('button', { name: `${unique}-booked (${unique}) Unavailable for these dates` });
     await expect(booked).toBeVisible();
     await booked.click();
     await page.getByRole('button', { name: 'Submit request' }).click();
