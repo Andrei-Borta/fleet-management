@@ -13,6 +13,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env['CI'],
   retries: process.env['CI'] ? 1 : 0,
+  // Many local workers make the dev server time out.
+  workers: process.env['CI'] ? undefined : 2,
   reporter: process.env['CI'] ? [['html', { open: 'never' }], ['list']] : 'list',
   use: {
     baseURL: baseURL ?? 'http://localhost:4200',

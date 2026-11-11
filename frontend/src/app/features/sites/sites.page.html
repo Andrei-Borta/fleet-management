@@ -1,5 +1,7 @@
 <app-page-header title="Sites" subtitle="Construction sites and their budgets">
-  <a mat-flat-button routerLink="/sites/new">Add site</a>
+  @if (roles.can('sites.manage')) {
+    <a mat-flat-button routerLink="/sites/new">Add site</a>
+  }
 </app-page-header>
 
 <section class="card" [attr.aria-busy]="loading()">

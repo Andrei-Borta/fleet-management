@@ -278,7 +278,8 @@ test('shows period availability without preventing an occupied machine selection
   await request;
   await trigger.click();
   const cat = picker.getByRole('button', { name: /CAT 320/ });
-  await expect(cat.locator('app-status-badge')).toHaveAttribute('data-status', 'reserved');
+  await expect(cat).toContainText('Unavailable for these dates');
+  await expect(cat.locator('app-status-badge')).toHaveCount(0);
   await expect(picker.getByRole('button', { name: /Crane/ }).locator('app-status-badge')).toHaveAttribute('data-status', 'available');
   await expect(picker.getByRole('button', { name: /Broken digger/ }).locator('app-status-badge')).toHaveAttribute('data-status', 'defective');
   await cat.click();
