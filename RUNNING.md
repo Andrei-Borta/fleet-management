@@ -30,7 +30,15 @@ npm run e2e:ui                     # interactive Playwright UI
 
 ## Full stack in Docker (like production)
 ```bash
-docker compose -f docker-compose.prod.yml up --build     # http://localhost:8080
+docker compose -f docker-compose.prod.yml up --build -d  # http://localhost:8080
+docker compose -f docker-compose.prod.yml exec backend python seed.py   # demo data
+```
+The backend applies migrations on start; the database starts empty until you seed it.
+If the dev database is also running, add `-p fleet-prod` so the two stacks don't share containers.
+
+To run the demo storyline against this stack instead of the dev server (from `frontend/`):
+```bash
+E2E_BASE_URL=http://localhost:8080 E2E_API_URL=http://localhost:8080/api/v1 npx playwright test e2e/demo-flow.spec.ts
 ```
 
 ## Database tasks
