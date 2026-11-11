@@ -8,7 +8,6 @@ import { ErrorStateMatcher } from '@angular/material/core';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, distinctUntilChanged, finalize, forkJoin, map, merge, of, startWith, Subject, switchMap } from 'rxjs';
@@ -26,7 +25,7 @@ import { ReservationsService } from './reservations.service';
 @Component({
   selector: 'app-reservation-form-page',
   imports: [
-    DatePipe, MatButtonModule, MatFormFieldModule, MatInputModule, MatProgressBarModule, MatProgressSpinnerModule, MatSelectModule,
+    DatePipe, MatButtonModule, MatFormFieldModule, MatInputModule, MatProgressBarModule, MatSelectModule,
     OverlayModule, PageHeader, ReactiveFormsModule, RouterLink, StatusBadge,
   ],
   templateUrl: './reservation-form.page.html',
@@ -48,7 +47,7 @@ import { ReservationsService } from './reservations.service';
     .equipment-option:hover, .equipment-option:focus-visible { background: var(--color-surface-alt); }
     .equipment-option:disabled { opacity: 0.55; cursor: not-allowed; }
     .equipment-description { min-width: 0; overflow-wrap: anywhere; }
-    .request-loading { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); padding: var(--space-6); }
+    .request-loading { text-align: center; padding: var(--space-6); }
     .conflict h2 { text-align: center; }
     .conflict-list, .conflict-reason { text-align: center; }
     .conflict ul { list-style: none; margin: 0; padding: 0; }
@@ -169,12 +168,14 @@ export class ReservationFormPage {
     this.retryAvailability.next();
   }
 
-  protected equipmentStatus(item: Equipment): 'available' | 'reserved' | 'in_service' | 'defective' | 'retired' | null {
+  /** Badge status, or null when availability is unknown or the machine is blocked for the period. */
+  protected equipmentStatus(item: Equipment): 'available' | 'in_service' | 'defective' | 'retired' | null {
     if (item.status === 'in_service' || item.status === 'defective' || item.status === 'retired') {
       return item.status;
     }
     if (this.availability() !== 'ready') return null;
-    return this.availableIds().has(item.id) ? 'available' : 'reserved';
+    // Not available can mean booked, in maintenance or overdue for service, so don't guess "reserved".
+    return this.availableIds().has(item.id) ? 'available' : null;
   }
 
   protected load(): void {
