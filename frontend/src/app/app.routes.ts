@@ -13,6 +13,11 @@ const devRoutes: Routes = [
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
   {
+    path: 'dashboard/costs',
+    title: 'Site costs',
+    loadComponent: () => import('./features/dashboard/costs.page').then((m) => m.CostsPage),
+  },
+  {
     path: 'dashboard',
     title: 'Dashboard',
     loadComponent: () => import('./features/dashboard/dashboard.page').then((m) => m.DashboardPage),

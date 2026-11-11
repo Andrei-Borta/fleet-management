@@ -1,9 +1,9 @@
 import { DOCUMENT } from '@angular/common';
 import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { RouterLink } from '@angular/router';
 import {
   ArcElement,
   BarController,
@@ -33,14 +33,15 @@ const LOAD_ANIMATION_MS = 600;
 @Component({
   selector: 'app-dashboard-page',
   imports: [
-    PageHeader, StatusBadge, MatButtonModule, MatButtonToggleModule,
-    MatProgressBarModule, BaseChartDirective, PendingRequestsWidget, ServiceDueWidget, RouterLink,
+    PageHeader, StatusBadge, MatButtonModule, MatButtonToggleModule, RouterLink,
+    MatProgressBarModule, BaseChartDirective, PendingRequestsWidget, ServiceDueWidget,
   ],
   providers: [provideCharts({
     registerables: [ArcElement, BarController, BarElement, CategoryScale, DoughnutController, LinearScale, Tooltip],
   })],
   template: `
     <app-page-header title="Dashboard" subtitle="Fleet overview">
+      <a mat-stroked-button routerLink="/dashboard/costs">Site costs</a>
       <a mat-flat-button routerLink="/reservations/new">New reservation</a>
     </app-page-header>
     <section aria-label="Fleet overview" [attr.aria-busy]="loading()">
