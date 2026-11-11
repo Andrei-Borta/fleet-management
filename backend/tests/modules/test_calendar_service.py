@@ -268,3 +268,21 @@ def test_range_longer_than_93_days_is_rejected(db: Session) -> None:
 def test_range_ending_before_it_starts_is_rejected(db: Session) -> None:
     with pytest.raises(InvalidDataError, match="'to' must not be before 'from'"):
         service.list_calendar_events(db, END, START)
+
+
+def test_maintenance_finished_on_the_first_day_is_kept(db: Session) -> None:
+    equipment = make_equipment(db, "cal-done-first-day")
+    finished = maintain(
+        db,
+        equipment,
+        START - timedelta(days=3),
+        InterventionStatus.DONE,
+        completed_at=datetime(2099, 3, 1, 0, 30, tzinfo=UTC),
+    )
+
+    events = {
+        e.id: e for e in service.list_calendar_events(db, START, END, equipment_id=equipment.id)
+    }
+
+    event = events[finished.id]
+    assert (event.start, event.end) == (START - timedelta(days=3), START)
