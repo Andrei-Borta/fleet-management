@@ -1,0 +1,45 @@
+.table-scroll {
+  overflow-x: auto;
+}
+table {
+  width: 100%;
+}
+th {
+  background: var(--color-surface-alt) !important;
+  color: var(--color-text-muted);
+}
+tr.mat-mdc-row {
+  height: 52px;
+}
+tr.mat-mdc-row:hover {
+  background: var(--color-surface-alt);
+}
+td {
+  white-space: nowrap;
+}
+.num {
+  text-align: right;
+}
+.over-budget {
+  color: var(--color-danger);
+}
+.over td:first-child {
+  border-left: var(--space-1) solid var(--color-danger);
+}
+dl {
+  display: grid;
+  gap: var(--space-3);
+}
+dl > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+dd {
+  margin: 0;
+}
+
+.empty-state > .material-symbols-rounded {
+  font-size: var(--space-8);
+}

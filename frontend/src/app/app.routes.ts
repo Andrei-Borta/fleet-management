@@ -13,6 +13,11 @@ const devRoutes: Routes = [
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
   {
+    path: 'dashboard/costs',
+    title: 'Site costs',
+    loadComponent: () => import('./features/dashboard/costs.page').then((m) => m.CostsPage),
+  },
+  {
     path: 'dashboard',
     title: 'Dashboard',
     loadComponent: () => import('./features/dashboard/dashboard.page').then((m) => m.DashboardPage),
@@ -44,6 +49,12 @@ export const routes: Routes = [
     path: 'sites',
     title: 'Sites',
     loadComponent: () => import('./features/sites/sites.page').then((m) => m.SitesPage),
+  },
+  {
+    path: 'reservations/new',
+    title: 'New reservation',
+    loadComponent: () =>
+      import('./features/reservations/reservation-form.page').then((m) => m.ReservationFormPage),
   },
   {
     path: 'reservations',
