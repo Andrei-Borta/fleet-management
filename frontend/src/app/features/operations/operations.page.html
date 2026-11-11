@@ -1,0 +1,129 @@
+<app-page-header title="Operations" subtitle="Complete a safety check before starting a machine" />
+
+<section class="card checklist-card" aria-labelledby="checklist-title">
+  <h2 id="checklist-title">Daily safety checklist</h2>
+  <p class="intro">Check each item for today. A failed critical item will block the equipment.</p>
+
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Loading equipment" />
+  } @else if (failed()) {
+    <div class="error-state" role="alert">
+      <p>Equipment could not be loaded.</p>
+      <button mat-stroked-button type="button" (click)="loadEquipment()">Try again</button>
+    </div>
+  } @else if (equipment().length === 0) {
+    <div class="empty-state">
+      <span class="material-symbols-rounded" aria-hidden="true">construction</span>
+      <p>There is no active equipment to check.</p>
+    </div>
+  } @else {
+    <div class="form-fields">
+      <mat-form-field appearance="outline">
+        <mat-label>Equipment</mat-label>
+        <mat-select
+          [value]="selectedEquipmentId()"
+          (selectionChange)="selectedEquipmentId.set($event.value); submitted.set(null)"
+          data-testid="checklist-equipment"
+          required
+        >
+          @for (item of equipment(); track item.id) {
+            <mat-option [value]="item.id">{{ item.name }} ({{ item.serial_no }})</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Checklist date</mat-label>
+        <input
+          matInput
+          type="date"
+          [value]="checklistDate()"
+          (input)="setDate($event)"
+          data-testid="checklist-date"
+          required
+        />
+      </mat-form-field>
+    </div>
+
+    <div class="items-list" aria-label="Safety check items">
+      @for (item of items(); track item.id) {
+        <fieldset class="check-item" [attr.data-testid]="'check-item-' + item.id">
+          <legend>
+            <span>{{ item.name }}</span>
+            @if (item.critical) {
+              <span class="critical-label">Critical</span>
+            }
+          </legend>
+          <div class="answers">
+            <label>
+              <input
+                type="radio"
+                [name]="item.id"
+                [checked]="item.ok === true"
+                [disabled]="saving() || submitted() !== null"
+                (change)="setAnswer(item.id, true)"
+              />
+              <span>OK</span>
+            </label>
+            <label>
+              <input
+                type="radio"
+                [name]="item.id"
+                [checked]="item.ok === false"
+                [disabled]="saving() || submitted() !== null"
+                (change)="setAnswer(item.id, false)"
+              />
+              <span>Not OK</span>
+            </label>
+          </div>
+        </fieldset>
+      }
+    </div>
+
+    @if (criticalFailures().length > 0) {
+      <div class="warning-banner" role="alert" data-testid="critical-warning">
+        <span class="material-symbols-rounded" aria-hidden="true">warning</span>
+        <p>
+          <strong>Do not operate this machine.</strong>
+          Submitting this checklist will block the equipment because
+          {{ criticalFailures().length === 1 ? 'a critical item has' : 'critical items have' }}
+          failed: {{ criticalFailureNames() }}.
+        </p>
+      </div>
+    }
+
+    @if (submitted()) {
+      <div
+        class="result-banner"
+        [class.result-blocked]="criticalFailures().length > 0"
+        role="status"
+        data-testid="checklist-result"
+      >
+        @if (criticalFailures().length > 0) {
+          <strong>Checklist submitted. Equipment is blocked.</strong>
+          <span>A critical safety issue was recorded for maintenance.</span>
+        } @else {
+          <strong>Checklist submitted. Equipment passed today’s safety check.</strong>
+        }
+      </div>
+    }
+
+    @if (submitFailed()) {
+      <p class="submit-error" role="alert">
+        The checklist was not saved. Your answers are still here; try again.
+      </p>
+    }
+
+    <div class="form-actions">
+      <button
+        mat-flat-button
+        type="button"
+        (click)="submit()"
+        [disabled]="!canSubmit() || saving() || submitted() !== null"
+        data-testid="submit-checklist"
+      >
+        {{ saving() ? 'Submitting…' : 'Submit checklist' }}
+      </button>
+    </div>
+  }
+</section>

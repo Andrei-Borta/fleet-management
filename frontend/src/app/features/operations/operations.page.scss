@@ -1,0 +1,156 @@
+.checklist-card {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.checklist-card h2 {
+  margin: 0 0 var(--space-1);
+}
+
+.intro {
+  margin: 0 0 var(--space-5);
+  color: var(--color-text-muted);
+}
+
+.form-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.form-fields mat-form-field {
+  width: 100%;
+}
+
+.items-list {
+  border-top: 1px solid var(--color-border);
+}
+
+.check-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-4) 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.check-item legend {
+  float: left;
+  width: 50%;
+  padding: 0;
+  font-weight: 600;
+}
+
+.critical-label {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.answers {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  width: 50%;
+}
+
+.answers label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.answers input {
+  width: 1.125rem;
+  height: 1.125rem;
+  accent-color: var(--color-primary);
+}
+
+.warning-banner,
+.result-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+}
+
+.warning-banner {
+  background: var(--color-primary-soft);
+  color: var(--color-text);
+}
+
+.warning-banner .material-symbols-rounded {
+  color: var(--color-warning);
+}
+
+.warning-banner p {
+  margin: 0;
+}
+
+.result-banner {
+  flex-direction: column;
+  background: var(--color-primary-soft);
+}
+
+.result-blocked {
+  border-left: 3px solid var(--color-danger);
+  background: var(--color-surface-alt);
+}
+
+.result-banner span {
+  color: var(--color-text-muted);
+}
+
+.submit-error,
+.error-state {
+  color: var(--color-danger);
+}
+
+.error-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-5);
+}
+
+@media (max-width: 600px) {
+  .form-fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .check-item {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .check-item legend,
+  .answers {
+    float: none;
+    width: 100%;
+  }
+
+  .answers {
+    justify-content: flex-start;
+  }
+}
