@@ -15,10 +15,8 @@
       <button mat-stroked-button (click)="load()">Retry</button>
     </div>
   } @else if (saving()) {
-    <div class="request-loading" role="status">
-      <mat-spinner diameter="40" aria-label="Sending request" />
-      <p>Sending request…</p>
-    </div>
+    <mat-progress-bar mode="indeterminate" aria-label="Sending request" />
+    <p class="request-loading" role="status">Sending request…</p>
   } @else if (conflict()?.alternatives?.length) {
     @if (conflict(); as issue) {
     <section class="conflict" aria-labelledby="conflict-heading">
@@ -202,6 +200,8 @@
                   >
                   @if (equipmentStatus(machine); as status) {
                     <app-status-badge [status]="status" />
+                  } @else if (availability() === 'ready') {
+                    <span class="text-muted text-caption">Unavailable for these dates</span>
                   } @else {
                     <span class="text-muted text-caption">Availability unknown</span>
                   }

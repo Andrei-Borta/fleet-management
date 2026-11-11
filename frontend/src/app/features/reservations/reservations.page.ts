@@ -147,10 +147,13 @@ export class ReservationsPage {
           this.pageIndex.set(0);
           this.feedback.success(`Reservation ${updated.status}`);
         },
-        error: (error: unknown) =>
-          this.message.set(
-            asConflict(error)?.detail ?? 'The reservation could not be updated. Try again.',
-          ),
+        error: (error: unknown) => {
+          // Other failures already get a snackbar from the error interceptor.
+          const conflict = asConflict(error);
+          if (conflict) this.message.set(conflict.detail);
+          // The request may have changed meanwhile (approved, cancelled, machine blocked).
+          this.load();
+        },
       });
   }
 }
