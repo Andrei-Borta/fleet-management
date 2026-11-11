@@ -2,6 +2,7 @@
 
 from collections.abc import Iterator
 from datetime import date
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -56,8 +57,10 @@ def test_create_returns_a_pending_request(api, db):
 
 
 def test_create_conflict_returns_409_with_conflicts_and_alternatives(api, db):
-    equipment = make_equipment(db)
+    type_ = f"type-{uuid4().hex}"
+    equipment = make_equipment(db, type_=type_)
     existing = make_reservation(db, equipment)
+    alternative = make_equipment(db, type_=type_, hourly_cost=40)
 
     response = api.post(URL, json=request_body(equipment.id, make_site(db).id))
 
@@ -73,18 +76,29 @@ def test_create_conflict_returns_409_with_conflicts_and_alternatives(api, db):
                 "status": "approved",
             }
         ],
-        "alternatives": [],
+        "alternatives": [
+            {
+                "id": alternative.id,
+                "name": "Machine",
+                "type": type_,
+                "status": "available",
+                "hourly_cost": 40.0,
+            }
+        ],
     }
 
 
 def test_create_on_blocked_equipment_returns_409(api, db):
-    equipment = make_equipment(db, status=EquipmentStatus.DEFECTIVE)
+    type_ = f"type-{uuid4().hex}"
+    equipment = make_equipment(db, type_=type_, status=EquipmentStatus.DEFECTIVE)
+    alternative = make_equipment(db, type_=type_)
 
     response = api.post(URL, json=request_body(equipment.id, make_site(db).id))
 
     assert response.status_code == 409
     assert "defective" in response.json()["detail"]
     assert response.json()["conflicts"] == []
+    assert [a["id"] for a in response.json()["alternatives"]] == [alternative.id]
 
 
 def test_create_with_unknown_references_returns_404(api, db):
@@ -148,15 +162,17 @@ def test_reject(api, db):
 
 
 def test_approve_conflict_returns_409_with_conflicts_and_alternatives(api, db):
-    equipment = make_equipment(db)
+    type_ = f"type-{uuid4().hex}"
+    equipment = make_equipment(db, type_=type_)
     existing = make_reservation(db, equipment)
     pending = make_reservation(db, equipment, status=ReservationStatus.PENDING)
+    alternative = make_equipment(db, type_=type_)
 
     response = api.post(f"{URL}/{pending.id}/approve")
 
     assert response.status_code == 409
     assert [c["id"] for c in response.json()["conflicts"]] == [existing.id]
-    assert response.json()["alternatives"] == []
+    assert [a["id"] for a in response.json()["alternatives"]] == [alternative.id]
 
 
 def test_approve_outside_the_site_dates_returns_409(api, db):
@@ -182,3 +198,52 @@ def test_approving_twice_returns_409_without_conflict_list(api, db):
 @pytest.mark.parametrize("action", ["approve", "reject", "cancel"])
 def test_actions_on_unknown_reservation_return_404(api, action):
     assert api.post(f"{URL}/99999999/{action}").status_code == 404
+
+
+def test_alternatives_lists_free_equipment_of_the_same_type_cheapest_first(api, db):
+    type_ = f"type-{uuid4().hex}"
+    requested = make_equipment(db, type_=type_)
+    expensive = make_equipment(db, type_=type_, hourly_cost=90)
+    cheap = make_equipment(db, type_=type_, hourly_cost=30)
+    make_equipment(db, type_=type_, status=EquipmentStatus.DEFECTIVE)
+    make_reservation(db, make_equipment(db, type_=type_))
+
+    response = api.get(
+        f"{URL}/alternatives",
+        params={"equipment_id": requested.id, "start": "2026-11-10", "end": "2026-11-20"},
+    )
+
+    assert response.status_code == 200
+    assert [a["id"] for a in response.json()] == [cheap.id, expensive.id]
+    assert response.json()[0] == {
+        "id": cheap.id,
+        "name": "Machine",
+        "type": type_,
+        "status": "available",
+        "hourly_cost": 30.0,
+    }
+
+
+def test_alternatives_for_unknown_equipment_returns_404(api):
+    response = api.get(
+        f"{URL}/alternatives",
+        params={"equipment_id": 99999999, "start": "2026-11-10", "end": "2026-11-20"},
+    )
+
+    assert response.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"start": "2026-11-20", "end": "2026-11-10"},
+        {"start": "2026-11-10"},
+        {"start": "not-a-date", "end": "2026-11-20"},
+    ],
+)
+def test_alternatives_rejects_invalid_period(api, db, params):
+    response = api.get(
+        f"{URL}/alternatives", params={"equipment_id": make_equipment(db).id, **params}
+    )
+
+    assert response.status_code == 422

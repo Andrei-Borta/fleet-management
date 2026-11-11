@@ -9,9 +9,15 @@ export type Status =
   | 'pending'
   | 'approved'
   | 'rejected'
-  | 'cancelled';
+  | 'cancelled'
+  | 'planned'
+  | 'in_progress'
+  | 'done';
 
 const TONE: Record<Status, string> = {
+  planned: 'pending',
+  in_progress: 'service',
+  done: 'available',
   available: 'available',
   approved: 'available',
   reserved: 'reserved',

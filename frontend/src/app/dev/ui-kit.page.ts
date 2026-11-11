@@ -9,6 +9,7 @@ import { asConflict } from '../core/api-error';
 import { NotificationService } from '../core/notification.service';
 import { ConfirmService } from '../shared/confirm-dialog/confirm.service';
 import { PageHeader } from '../shared/page-header/page-header';
+import { StatusBadge } from '../shared/status-badge/status-badge';
 
 /** Endpoint that doesn't exist on the backend. Playwright mocks it to simulate responses. */
 export const UI_KIT_PROBE_URL = `${API_URL}/dev/ui-kit-probe`;
@@ -20,10 +21,18 @@ export const UI_KIT_PROBE_URL = `${API_URL}/dev/ui-kit-probe`;
  */
 @Component({
   selector: 'app-ui-kit-page',
-  imports: [PageHeader, MatButtonModule, MatProgressBarModule],
+  imports: [PageHeader, MatButtonModule, MatProgressBarModule, StatusBadge],
   template: `
     <app-page-header title="UI kit" subtitle="Shared building blocks (dev only)" />
 
+    <section class="card">
+      <h2>Maintenance statuses</h2>
+      <div class="actions">
+        <app-status-badge status="planned" />
+        <app-status-badge status="in_progress" />
+        <app-status-badge status="done" />
+      </div>
+    </section>
     <section class="card">
       <h2>Notifications</h2>
       <div class="actions">

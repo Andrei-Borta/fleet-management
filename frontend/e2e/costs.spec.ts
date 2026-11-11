@@ -29,10 +29,12 @@ test('shows budget comparison, filters, and drills into equipment and maintenanc
   await page.route('**/api/v1/dashboard/costs', (route) => route.fulfill({ json: { sites } }));
   await page.goto('/dashboard');
   await page.getByRole('link', { name: 'Site costs', exact: true }).click();
+  await expect(page.getByRole('columnheader', { name: 'Committed', exact: true })).toBeVisible();
   await expect(page.getByText('Over budget ·')).toBeVisible();
   await expect(page.getByRole('cell', { name: '1.250,00 RON', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'View costs for Bridge', exact: true }).click();
   const breakdown = page.getByTestId('cost-breakdown');
+  await expect(breakdown.getByText('Committed', { exact: true })).toBeVisible();
   await expect(breakdown.getByText('900,00 RON', { exact: true })).toBeVisible();
   await expect(breakdown.getByText('350,00 RON', { exact: true })).toBeVisible();
   await page.getByRole('combobox', { name: 'Site', exact: true }).click();

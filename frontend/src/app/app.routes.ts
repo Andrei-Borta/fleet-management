@@ -56,5 +56,20 @@ export const routes: Routes = [
       import('./features/operations/operations.page').then((m) => m.OperationsPage),
   },
   ...(isDevMode() ? devRoutes : []),
+  {
+    path: 'sites/new',
+    title: 'Add site',
+    loadComponent: () => import('./features/sites/site-form.page').then((m) => m.SiteFormPage),
+  },
+  {
+    path: 'sites/:id/edit',
+    title: 'Edit site',
+    loadComponent: () => import('./features/sites/site-form.page').then((m) => m.SiteFormPage),
+  },
+  {
+    path: 'sites/:id',
+    title: 'Site details',
+    loadComponent: () => import('./features/sites/site-detail.page').then((m) => m.SiteDetailPage),
+  },
   { path: '**', redirectTo: 'dashboard' },
 ];

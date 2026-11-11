@@ -1,0 +1,81 @@
+<app-page-header [title]="site()?.name || 'Site details'">
+  <a mat-button routerLink="/sites">Back to sites</a>
+  @if (site()) {
+    <a mat-flat-button [routerLink]="['/sites', id, 'edit']">Edit site</a>
+  }
+</app-page-header>
+
+<section class="card" [attr.aria-busy]="loading()">
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Loading site" />
+  } @else if (failed()) {
+    <div class="empty-state">
+      <span class="material-symbols-rounded" aria-hidden="true">error</span>
+      <p>Site could not be loaded.</p>
+      <button mat-stroked-button (click)="load()">Retry</button>
+    </div>
+  } @else if (site(); as item) {
+    <dl class="form-grid">
+      <div>
+        <dt>Address</dt>
+        <dd>{{ item.address }}</dd>
+      </div>
+      <div>
+        <dt>Budget</dt>
+        <dd class="num">{{ item.budget | currency: 'RON' : 'code' : '1.2-2' : 'ro' }}</dd>
+      </div>
+      <div>
+        <dt>Start date</dt>
+        <dd>{{ item.start_date | date: 'dd MMM yyyy' }}</dd>
+      </div>
+      <div>
+        <dt>End date</dt>
+        <dd>{{ item.end_date | date: 'dd MMM yyyy' }}</dd>
+      </div>
+    </dl>
+  }
+</section>
+
+@if (site()) {
+  <section
+    class="card"
+    aria-labelledby="reservations-heading"
+    [attr.aria-busy]="loadingReservations()"
+  >
+    <h2 id="reservations-heading">Reservations</h2>
+    @if (loadingReservations()) {
+      <mat-progress-bar mode="indeterminate" aria-label="Loading reservations" />
+    } @else if (reservationsFailed()) {
+      <div class="empty-state">
+        <span class="material-symbols-rounded" aria-hidden="true">error</span>
+        <p>Reservations could not be loaded.</p>
+        <button mat-stroked-button (click)="loadReservations()">Retry</button>
+      </div>
+    } @else if (!reservations().length) {
+      <div class="empty-state" role="status">
+        <span class="material-symbols-rounded" aria-hidden="true">event_busy</span>
+        <p>No reservations for this site.</p>
+      </div>
+    } @else {
+      <ul aria-label="Site reservations">
+        @for (reservation of reservations(); track reservation.id) {
+          <li>
+            @if (hasEquipmentDetails) {
+              <a [routerLink]="['/equipment', reservation.equipment_id]">{{
+                equipmentName(reservation.equipment_id)
+              }}</a>
+            } @else {
+              <span>{{ equipmentName(reservation.equipment_id) }}</span>
+            }
+            · {{ reservation.start_date | date: 'dd MMM yyyy' }} –
+            {{ reservation.end_date | date: 'dd MMM yyyy' }}
+            <app-status-badge [status]="reservation.status" />
+            @if (reservation.note) {
+              <div class="text-muted">{{ reservation.note }}</div>
+            }
+          </li>
+        }
+      </ul>
+    }
+  </section>
+}
