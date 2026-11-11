@@ -1,0 +1,34 @@
+.filters-bar mat-form-field {
+  flex: 1 1 10rem;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+table {
+  min-width: 34rem;
+}
+
+th.mat-mdc-header-cell {
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+}
+
+tr.mat-mdc-row {
+  height: 52px;
+}
+
+tr.mat-mdc-row:hover {
+  background: var(--color-surface-alt);
+}
+
+.numeric {
+  text-align: right;
+  white-space: nowrap;
+}
+
+th.mat-column-engine_hours,
+th.mat-column-hourly_cost {
+  justify-items: end;
+}
