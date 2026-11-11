@@ -1,10 +1,14 @@
 <app-page-header [title]="site()?.name || 'Site details'">
   <a mat-button routerLink="/sites">Back to sites</a>
   @if (site()) {
-    <a mat-button [routerLink]="['/sites', id, 'edit']">Edit site</a>
-    <a mat-flat-button routerLink="/reservations/new" [queryParams]="{ site_id: id }">
-      Reserve equipment
-    </a>
+    @if (roles.can('sites.manage')) {
+      <a mat-button [routerLink]="['/sites', id, 'edit']">Edit site</a>
+    }
+    @if (roles.can('reservations.request')) {
+      <a mat-flat-button routerLink="/reservations/new" [queryParams]="{ site_id: id }">
+        Reserve equipment
+      </a>
+    }
   }
 </app-page-header>
 
