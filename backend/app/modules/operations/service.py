@@ -1,5 +1,6 @@
 """Business logic for the operations module."""
 
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -7,9 +8,14 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import InvalidDataError, NotFoundError
 from app.modules.equipment.models import Equipment
+from app.modules.maintenance.models import Defect, DefectSeverity, DefectStatus
 from app.modules.maintenance.service import recompute_status
-from app.modules.operations.models import UsageLog
-from app.modules.operations.schemas import UsageCreate, UsageSummaryRead
+from app.modules.operations.models import Checklist, ChecklistItem, UsageLog
+from app.modules.operations.schemas import (
+    ChecklistCreate,
+    UsageCreate,
+    UsageSummaryRead,
+)
 from app.modules.sites.models import Site
 
 
@@ -66,3 +72,64 @@ def list_usage(
         total_hours=total_hours,
         total_fuel_liters=total_fuel_liters,
     )
+
+
+def create_checklist(db: Session, data: ChecklistCreate) -> Checklist:
+    """Record a daily safety checklist for an equipment.
+
+    If any critical item fails (ok is False and critical is True),
+    create an open critical defect and auto-block the equipment by recomputing status.
+    """
+    if not data.items:
+        raise InvalidDataError("Checklist must contain at least one item")
+
+    equipment = db.get(Equipment, data.equipment_id, with_for_update=True)
+    if equipment is None:
+        raise NotFoundError("Equipment not found")
+
+    checklist = Checklist(
+        equipment_id=data.equipment_id,
+        date=data.date,
+        items=[
+            ChecklistItem(
+                name=item.name,
+                ok=item.ok,
+                critical=item.critical,
+            )
+            for item in data.items
+        ],
+    )
+    db.add(checklist)
+    db.flush()
+
+    critical_failures = [item for item in data.items if item.critical and not item.ok]
+    if critical_failures:
+        for failure in critical_failures:
+            defect = Defect(
+                equipment_id=data.equipment_id,
+                description=f"Safety checklist failure: {failure.name}",
+                severity=DefectSeverity.CRITICAL,
+                status=DefectStatus.OPEN,
+            )
+            db.add(defect)
+        db.flush()
+        recompute_status(db, equipment.id)
+
+    db.commit()
+    db.refresh(checklist)
+    return checklist
+
+
+def list_checklists(
+    db: Session,
+    equipment_id: int | None = None,
+    date: date | None = None,
+) -> list[Checklist]:
+    """List daily safety checklists, optionally filtered by equipment_id and date."""
+    stmt = select(Checklist).order_by(Checklist.date.desc(), Checklist.id.desc())
+    if equipment_id is not None:
+        stmt = stmt.where(Checklist.equipment_id == equipment_id)
+    if date is not None:
+        stmt = stmt.where(Checklist.date == date)
+
+    return list(db.scalars(stmt).all())
