@@ -80,8 +80,8 @@ test('demo storyline: request, conflict, approval, defect, repair and costs', as
     reservationIds.push(rivalBooking.id);
 
     // Scene 2, site manager: request the excavator → conflict → choose an alternative.
-    await page.goto(`/sites/${site.id}`);
     await selectRole(page, 'site_manager');
+    await page.goto(`/sites/${site.id}`);
     await page.getByRole('link', { name: 'Reserve equipment' }).click();
     await page.getByLabel('Start date').fill('2027-02-03');
     await page.getByLabel('End date').fill('2027-02-05');
@@ -130,8 +130,8 @@ test('demo storyline: request, conflict, approval, defect, repair and costs', as
     await details.getByRole('button', { name: 'Close', exact: true }).click();
 
     // Scene 4, operator: report a critical defect → the machine is auto-blocked.
-    await page.goto(`/equipment/${alternative.id}`);
     await selectRole(page, 'operator');
+    await page.goto(`/equipment/${alternative.id}`);
     await page.getByRole('link', { name: 'Report defect' }).click();
     await page.getByRole('textbox', { name: 'Description' }).fill('Hydraulic leak on the boom');
     await page.getByRole('combobox', { name: 'Severity' }).click();
@@ -198,13 +198,13 @@ test('demo storyline: request, conflict, approval, defect, repair and costs', as
     await expect(page.getByText('Available', { exact: true })).toBeVisible();
 
     // Scene 5, fleet manager: dashboard availability and cost vs. budget.
-    await selectRole(page, 'fleet_manager');
+    // Switching to the fleet manager opens the dashboard.
     const fleetResponse = page.waitForResponse(
       (response) =>
         response.url().includes('/api/v1/dashboard/fleet?') &&
         response.request().method() === 'GET',
     );
-    await page.getByRole('link', { name: 'Dashboard', exact: true }).click();
+    await selectRole(page, 'fleet_manager');
     const stats: FleetStats = await (await fleetResponse).json();
     const count = (status: EquipmentStatus) =>
       stats.by_status.find((item) => item.status === status)?.count ?? 0;

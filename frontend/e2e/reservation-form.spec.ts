@@ -27,8 +27,9 @@ test('sends a request and returns to pending reservations', async ({ page }) => 
     role = route.request().headers()['x-role'];
     return route.fulfill({ status: 201, json: { id: 100, ...(body as object), status: 'pending', requested_by_role: role } });
   });
-  await page.goto('/reservations/new?site_id=42');
+  await page.goto('/');
   await page.getByTestId('role-switcher').selectOption('site_manager');
+  await page.goto('/reservations/new?site_id=42');
   await page.getByLabel('Start date').fill('2026-11-12');
   await page.getByLabel('End date').fill('2026-11-14');
   await page.getByRole('combobox', { name: 'Equipment', exact: true }).click();

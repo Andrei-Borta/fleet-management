@@ -14,7 +14,10 @@ export function uniqueId(prefix = 'E2E'): string {
   return `${prefix}-${randomUUID().slice(0, 8)}`;
 }
 
-/** Switches the demo role in the top bar. Subsequent API calls send it as the X-Role header. */
+/**
+ * Switches the demo role in the top bar, which opens that role's home page.
+ * Subsequent API calls send the role as the X-Role header.
+ */
 export async function selectRole(page: Page, role: Role): Promise<void> {
   await page.getByTestId('role-switcher').selectOption(role);
   await expect(page.getByTestId('role-switcher')).toHaveValue(role);

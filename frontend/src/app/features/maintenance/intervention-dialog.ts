@@ -1,6 +1,12 @@
 import { CurrencyPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormControl,
+  FormGroupDirective,
+  NonNullableFormBuilder,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -70,15 +76,26 @@ export interface InterventionDialogData {
       }
 
       @if (editable()) {
-        <form class="row" [formGroup]="partForm" (ngSubmit)="addPart()" data-testid="part-form">
+        <form
+          class="row"
+          [formGroup]="partForm"
+          #partFormDirective="ngForm"
+          (ngSubmit)="addPart(partFormDirective)"
+          data-testid="part-form"
+        >
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>Part name</mat-label>
-            <input matInput formControlName="name" />
+            <!-- Enter moves on to the quantity instead of adding a half-filled part. -->
+            <input
+              matInput
+              formControlName="name"
+              (keydown.enter)="$event.preventDefault(); qtyInput.focus()"
+            />
             <mat-error>Enter a part name.</mat-error>
           </mat-form-field>
           <mat-form-field appearance="outline" subscriptSizing="dynamic" class="small">
             <mat-label>Qty</mat-label>
-            <input matInput type="number" min="1" step="1" formControlName="qty" />
+            <input #qtyInput matInput type="number" min="1" step="1" formControlName="qty" />
             <mat-error>Enter a quantity of 1 or more.</mat-error>
           </mat-form-field>
           <mat-form-field appearance="outline" subscriptSizing="dynamic" class="small">
@@ -184,7 +201,8 @@ export class InterventionDialog {
   protected readonly partForm = this.fb.group({
     name: ['', [Validators.required, Validators.pattern(/\S/), Validators.maxLength(200)]],
     qty: [1, [Validators.required, Validators.min(1)]],
-    unit_cost: [0, [Validators.required, Validators.min(0)]],
+    // Empty until typed, so a part is never added at 0 RON by accident.
+    unit_cost: new FormControl<number | null>(null, [Validators.required, Validators.min(0)]),
   });
 
   protected readonly laborForm = this.fb.group({
@@ -192,16 +210,18 @@ export class InterventionDialog {
     labor_rate: [this.data.intervention.labor_rate, [Validators.required, Validators.min(0)]],
   });
 
-  protected addPart(): void {
+  protected addPart(form: FormGroupDirective): void {
     if (this.partForm.invalid) {
       this.partForm.markAllAsTouched();
       return;
     }
     const { name, qty, unit_cost } = this.partForm.getRawValue();
+    if (unit_cost === null) return;
     this.save(
       this.api.addPart(this.item().id, { name: name.trim(), qty: Math.trunc(qty), unit_cost }),
       'Part added',
-      () => this.partForm.reset({ name: '', qty: 1, unit_cost: 0 }),
+      // resetForm also clears the submitted state, so the empty fields don't show errors.
+      () => form.resetForm({ name: '', qty: 1, unit_cost: null }),
     );
   }
 

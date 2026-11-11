@@ -29,8 +29,10 @@ test('real API: requests an alternative after a booking conflict', async ({ page
   expect(approval.status()).toBe(200);
   let createdId: number | undefined;
   try {
-    await page.goto(`/sites/${site.id}`);
+    // Switching role opens the role's home, so pick the role before opening the site.
+    await page.goto('/');
     await page.getByTestId('role-switcher').selectOption('site_manager');
+    await page.goto(`/sites/${site.id}`);
     await page.getByRole('link', { name: 'Reserve equipment' }).click();
     await page.getByLabel('Start date').fill('2099-11-12');
     await page.getByLabel('End date').fill('2099-11-14');

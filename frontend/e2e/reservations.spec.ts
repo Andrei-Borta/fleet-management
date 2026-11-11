@@ -72,8 +72,9 @@ test('role changes hide approvals and cancellation requires confirmation', async
     cancelled = true;
     return route.fulfill({ json: { id: 1, status: 'cancelled' } });
   });
-  await page.goto('/reservations');
+  await page.goto('/');
   await page.getByTestId('role-switcher').selectOption('site_manager');
+  await page.goto('/reservations');
   await expect(page.getByRole('button', { name: 'Approve reservation 1' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Cancel reservation 1', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
@@ -85,6 +86,7 @@ test('role changes hide approvals and cancellation requires confirmation', async
   await expect(page.getByText('No reservations match these filters.')).toBeVisible();
   expect(cancelled).toBe(true);
   await page.getByTestId('role-switcher').selectOption('operator');
+  await page.getByRole('link', { name: 'Reservations', exact: true }).click();
   await page.getByRole('tab', { name: 'All', exact: true }).click();
   await expect(
     page.getByRole('button', { name: /Approve reservation|Reject reservation|Cancel reservation/ }),
