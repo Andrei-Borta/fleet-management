@@ -1,8 +1,20 @@
 # User guide
 
 Fleet Management keeps construction equipment, site bookings, repairs and costs in one place.
-There is no login in the MVP: pick your role from the **Role** menu in the top bar. The role is
-not saved, so it goes back to *Fleet manager* when you reload the page.
+There is no login in the MVP: pick your role from the **Role** menu in the top bar. The browser
+remembers the role after a reload.
+
+Each role sees only its own pages in the side menu and starts on its own page:
+
+| Role | Starts on | Side menu |
+|---|---|---|
+| Fleet manager | Dashboard | Everything |
+| Site manager | Dashboard | Dashboard, Equipment, Sites, Reservations, Calendar |
+| Operator | Operations | Equipment, Reservations, Calendar, Maintenance (read-only), Operations |
+| Mechanic | Maintenance | Equipment, Calendar, Maintenance |
+
+Opening a page your role can't use (for example a bookmarked *Add site* link) takes you to your
+start page. Roles only shape the screens in the MVP; there is no permission check on the server.
 
 Statuses used everywhere:
 
@@ -65,17 +77,22 @@ You run the machines and report problems.
 A **critical** defect blocks the machine straight away: it becomes *Defective* and cannot be
 reserved until the repair is closed.
 
+You can follow repairs on **Maintenance**, but only a mechanic or the fleet manager can change them.
 The daily safety checklist and the hours and fuel log are coming in **Operations**.
 
 ## Mechanic
 
 You repair machines and record what each repair cost.
 
-- A repair moves from *planned* to *in progress* to *done*. While it is in progress the machine is
-  *In service*. Closing it resolves the linked defect and makes the machine available again.
-- Record labour hours, the labour rate and every part (quantity and unit cost). The total is
-  charged to the site that had the machine booked on the repair date.
+Open **Maintenance**. It shows the machines due for service soon, the open defects and a board
+with the columns *Planned*, *In progress* and *Done*.
 
-The maintenance board for these steps is in progress
-([#27](https://github.com/Andrei-Borta/fleet-management/issues/27)); until then the API
-(`/api/v1/maintenance/interventions`) supports the full flow.
+1. Next to an open defect, select **Plan repair**. The repair is planned for today.
+2. Select **Start** on the card. While the repair is in progress the machine is *In service*.
+3. Select **Parts and labour** to add every part (name, quantity and unit cost) and to save the
+   labour hours and rate. The total updates as you add them.
+4. Select **Complete**. Closing the repair resolves the linked defect and makes the machine
+   available again.
+
+The repair cost is charged to the site that had the machine booked on the repair date.
+The fleet manager can use the board too.
