@@ -12,6 +12,10 @@ test.beforeEach(async ({ page }) => {
     { id: 4, name: 'Service digger', type: 'excavator', status: 'in_service' },
     { id: 5, name: 'Old digger', type: 'excavator', status: 'retired' },
   ] }));
+  await page.route('**/api/v1/equipment?*', (route) => route.fulfill({ json: [
+    { id: 1, name: 'CAT 320', type: 'excavator', status: 'available' },
+    { id: 3, name: 'Crane', type: 'crane', status: 'available' },
+  ] }));
 });
 
 test('opens the reservation route from each entry point', async ({ page }) => {
@@ -86,6 +90,85 @@ test('filters equipment and allows choosing defective and in-service machines', 
   await page.keyboard.press('Escape');
   await expect(picker).toHaveCount(0);
   await expect(trigger).toBeFocused();
+});
+
+test('shows period availability without preventing an occupied machine selection', async ({ page }) => {
+  await page.route('**/api/v1/equipment?*', (route) => route.fulfill({ json: [
+    { id: 3, name: 'Crane', type: 'crane', status: 'available' },
+  ] }));
+  await page.goto('/reservations/new?site_id=42');
+  const trigger = page.getByRole('combobox', { name: 'Equipment', exact: true });
+  await trigger.click();
+  const picker = page.getByRole('dialog', { name: 'Choose equipment' });
+  await expect(picker.getByText('Choose a valid date range to check availability.')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.getByLabel('Start date').fill('2026-11-12');
+  const request = page.waitForRequest((r) => r.url().includes('available_from=2026-11-12') && r.url().includes('available_to=2026-11-14'));
+  await page.getByLabel('End date').fill('2026-11-14');
+  await request;
+  await trigger.click();
+  const cat = picker.getByRole('button', { name: /CAT 320/ });
+  await expect(cat.locator('app-status-badge')).toHaveAttribute('data-status', 'reserved');
+  await expect(picker.getByRole('button', { name: /Crane/ }).locator('app-status-badge')).toHaveAttribute('data-status', 'available');
+  await expect(picker.getByRole('button', { name: /Broken digger/ }).locator('app-status-badge')).toHaveAttribute('data-status', 'defective');
+  await cat.click();
+  await expect(trigger).toHaveValue('CAT 320');
+});
+
+test('clears stale availability on date changes and retries a failed lookup', async ({ page }) => {
+  let requests = 0;
+  await page.route('**/api/v1/equipment?*', (route) => {
+    requests++;
+    return requests === 1
+      ? route.fulfill({ status: 503, json: { detail: 'Unavailable' } })
+      : route.fulfill({ json: [{ id: 1, name: 'CAT 320', type: 'excavator', status: 'available' }] });
+  });
+  await page.goto('/reservations/new?site_id=42');
+  await page.getByLabel('Start date').fill('2026-11-12');
+  await page.getByLabel('End date').fill('2026-11-14');
+  const trigger = page.getByRole('combobox', { name: 'Equipment', exact: true });
+  await trigger.click();
+  const picker = page.getByRole('dialog', { name: 'Choose equipment' });
+  await expect(picker.getByText('Availability could not be checked.')).toBeVisible();
+  await expect(picker.getByRole('button', { name: /CAT 320/ })).toContainText('Availability unknown');
+  await picker.getByRole('button', { name: 'Retry availability' }).click();
+  await expect(picker.getByRole('button', { name: /CAT 320/ }).locator('app-status-badge')).toHaveAttribute('data-status', 'available');
+  await page.keyboard.press('Escape');
+  await page.getByLabel('End date').fill('2026-11-10');
+  await trigger.click();
+  await expect(picker.getByText('Choose a valid date range to check availability.')).toBeVisible();
+  await expect(picker.getByRole('button', { name: /CAT 320/ })).toContainText('Availability unknown');
+  expect(requests).toBe(2);
+});
+
+test('a late response cannot replace availability for newer dates', async ({ page }) => {
+  let releaseFirst: () => void = () => undefined;
+  const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+  await page.route('**/api/v1/equipment?*', async (route) => {
+    const end = new URL(route.request().url()).searchParams.get('available_to');
+    if (end === '2026-11-14') {
+      await firstGate;
+      await route.fulfill({ json: [] }).catch(() => undefined);
+    } else {
+      await route.fulfill({ json: [{ id: 1, name: 'CAT 320', type: 'excavator', status: 'available' }] });
+    }
+  });
+  try {
+    await page.goto('/reservations/new?site_id=42');
+    await page.getByLabel('Start date').fill('2026-11-12');
+    const firstRequest = page.waitForRequest((r) => r.url().includes('available_to=2026-11-14'));
+    await page.getByLabel('End date').fill('2026-11-14');
+    await firstRequest;
+    const nextResponse = page.waitForResponse((r) => r.url().includes('available_to=2026-11-15'));
+    await page.getByLabel('End date').fill('2026-11-15');
+    await nextResponse;
+    releaseFirst();
+    await page.getByRole('combobox', { name: 'Equipment', exact: true }).click();
+    const cat = page.getByRole('dialog', { name: 'Choose equipment' }).getByRole('button', { name: /CAT 320/ });
+    await expect(cat.locator('app-status-badge')).toHaveAttribute('data-status', 'available');
+  } finally {
+    releaseFirst();
+  }
 });
 
 test('handles an unknown site link and retries a failed load', async ({ page }) => {

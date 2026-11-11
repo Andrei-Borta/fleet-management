@@ -9,7 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { finalize, forkJoin } from 'rxjs';
+import { catchError, distinctUntilChanged, finalize, forkJoin, map, merge, of, startWith, Subject, switchMap } from 'rxjs';
 
 import { PageHeader } from '../../shared/page-header/page-header';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
@@ -56,6 +56,9 @@ export class ReservationFormPage {
   protected readonly search = signal('');
   protected readonly category = signal('');
   protected readonly selectedEquipment = signal<Equipment | null>(null);
+  protected readonly availability = signal<'unknown' | 'loading' | 'ready' | 'failed'>('unknown');
+  private readonly availableIds = signal<Set<number>>(new Set());
+  private readonly retryAvailability = new Subject<void>();
   private readonly equipmentTrigger = viewChild<ElementRef<HTMLInputElement>>('equipmentTrigger');
   private readonly equipmentSearch = viewChild<ElementRef<HTMLInputElement>>('equipmentSearch');
   protected readonly categories = computed(() =>
@@ -90,7 +93,56 @@ export class ReservationFormPage {
   };
 
   constructor() {
+    const periods = this.form.valueChanges.pipe(
+      startWith(null),
+      map(() => this.period()),
+      distinctUntilChanged((a, b) => a?.start === b?.start && a?.end === b?.end),
+    );
+    merge(periods, this.retryAvailability.pipe(map(() => this.period())))
+      .pipe(
+        switchMap((period) => {
+          this.availableIds.set(new Set());
+          if (!period) {
+            this.availability.set('unknown');
+            return of(null);
+          }
+          this.availability.set('loading');
+          return this.api.availableEquipment(period.start, period.end).pipe(
+            map((equipment) => ({ equipment })),
+            catchError(() => of({ equipment: null })),
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((result) => {
+        if (!result) return;
+        if (result.equipment === null) {
+          this.availability.set('failed');
+          return;
+        }
+        this.availableIds.set(new Set(result.equipment.map((item) => item.id)));
+        this.availability.set('ready');
+      });
     this.load();
+  }
+
+  private period(): { start: string; end: string } | null {
+    const { start_date: start, end_date: end } = this.form.getRawValue();
+    if (this.form.controls.start_date.invalid || this.form.controls.end_date.invalid ||
+      this.form.hasError('dateOrder') || this.form.hasError('outsideBounds')) return null;
+    return { start, end };
+  }
+
+  protected retryEquipmentAvailability(): void {
+    this.retryAvailability.next();
+  }
+
+  protected equipmentStatus(item: Equipment): 'available' | 'reserved' | 'in_service' | 'defective' | 'retired' | null {
+    if (item.status === 'in_service' || item.status === 'defective' || item.status === 'retired') {
+      return item.status;
+    }
+    if (this.availability() !== 'ready') return null;
+    return this.availableIds().has(item.id) ? 'available' : 'reserved';
   }
 
   protected load(): void {

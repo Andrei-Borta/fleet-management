@@ -60,11 +60,23 @@
                 </mat-select>
               </mat-form-field>
             </div>
+            @if (availability() === 'unknown') {
+              <p class="text-muted" role="status">Choose a valid date range to check availability.</p>
+            } @else if (availability() === 'loading') {
+              <mat-progress-bar mode="indeterminate" aria-label="Checking equipment availability" />
+            } @else if (availability() === 'failed') {
+              <p class="text-muted" role="status">Availability could not be checked.</p>
+              <button mat-stroked-button type="button" (click)="retryEquipmentAvailability()">Retry availability</button>
+            }
             <div class="equipment-list" aria-label="Equipment choices">
               @for (machine of filteredEquipment(); track machine.id) {
                 <button type="button" class="equipment-option" [disabled]="machine.status === 'retired'" (click)="selectEquipment(machine)">
                   <span class="equipment-description">{{ machine.name }} <span class="text-muted">({{ machine.type }})</span></span>
-                  <app-status-badge [status]="machine.status" />
+                  @if (equipmentStatus(machine); as status) {
+                    <app-status-badge [status]="status" />
+                  } @else {
+                    <span class="text-muted text-caption">Availability unknown</span>
+                  }
                 </button>
               } @empty {
                 <p class="text-muted" role="status">No equipment matches these filters.</p>
