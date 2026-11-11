@@ -1,5 +1,7 @@
 <app-page-header title="Equipment" subtitle="All machines in the fleet">
-  <a mat-flat-button routerLink="/equipment/new">Add equipment</a>
+  @if (roles.can('equipment.manage')) {
+    <a mat-flat-button routerLink="/equipment/new">Add equipment</a>
+  }
 </app-page-header>
 
 <section class="filters-bar" aria-label="Equipment filters">

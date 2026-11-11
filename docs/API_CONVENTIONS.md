@@ -35,7 +35,7 @@
 - `GET /reservations/calendar?from=&to=&site_id=&equipment_id=` feeds the central calendar. `from` and
   `to` are required, inclusive ISO dates, at most 93 days apart (`422` otherwise, also when `to` is
   before `from`). It returns events `{type, id, equipment: {id, name, type}, site: {id, name} | null,
-start, end, status}`, ordered by `start`. `type` is `reservation` (pending and approved only) or
+  start, end, status}`, ordered by `start`. `type` is `reservation` (pending and approved only) or
   `maintenance` (planned, in progress or done); `id` is the reservation or intervention id. Maintenance
   has no site and `end` is `null` while in progress. Filtering by `site_id` returns reservations only.
 - Defects live under `/maintenance/defects`: `POST` reports one (`equipment_id`, `description`,
@@ -78,3 +78,4 @@ start, end, status}`, ordered by `start`. `type` is `reservation` (pending and a
   hours_until_due, overdue}`; the `*_until_due` values are negative when overdue and `null` when that
   interval or its last-service reading is not set. Overdue rows come first. This only reports: it does not
   change the equipment status.
+- `POST /operations/checklists` records an operator daily safety checklist (`equipment_id`, `date`, `items: [{name, ok, critical}]`). If any critical item fails (`ok` is `false` and `critical` is `true`), an open critical defect is created and the equipment is auto-blocked to `defective` (unless retired or in service). `GET /operations/checklists?equipment_id=&date=` lists checklists with optional equipment and date filters.

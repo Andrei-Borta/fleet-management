@@ -1,5 +1,7 @@
 <app-page-header title="Reservations" subtitle="Review requests and manage fleet bookings">
-  <a mat-flat-button routerLink="/reservations/new">New reservation</a>
+  @if (roles.can('reservations.request')) {
+    <a mat-flat-button routerLink="/reservations/new">New reservation</a>
+  }
 </app-page-header>
 <section class="filters-bar">
   <mat-form-field appearance="outline"
@@ -67,7 +69,7 @@
         <ng-container matColumnDef="actions"
           ><th mat-header-cell *matHeaderCellDef class="text-caption">Actions</th>
           <td mat-cell *matCellDef="let r">
-            @if (roles.role() === 'fleet_manager' && r.status === 'pending') {
+            @if (roles.can('reservations.decide') && r.status === 'pending') {
               <button
                 mat-icon-button
                 matTooltip="Approve reservation"

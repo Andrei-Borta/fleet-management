@@ -37,3 +37,33 @@ class UsageSummaryRead(BaseModel):
     @field_serializer("total_hours", "total_fuel_liters", when_used="json")
     def serialize_totals(self, value: Decimal) -> float:
         return float(value)
+
+
+class ChecklistItemCreate(BaseModel):
+    name: str
+    ok: bool
+    critical: bool
+
+
+class ChecklistItemRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    ok: bool
+    critical: bool
+
+
+class ChecklistCreate(BaseModel):
+    equipment_id: int
+    date: date
+    items: list[ChecklistItemCreate]
+
+
+class ChecklistRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    equipment_id: int
+    date: date
+    items: list[ChecklistItemRead]

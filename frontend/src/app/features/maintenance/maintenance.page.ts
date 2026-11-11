@@ -3,20 +3,24 @@ import { MatButtonModule } from '@angular/material/button';
 import { RouterLink } from '@angular/router';
 
 import { PageHeader } from '../../shared/page-header/page-header';
+import { MaintenanceBoard } from './maintenance-board';
+import { ServiceDueSoon } from './service-due-soon';
 
 @Component({
   selector: 'app-maintenance-page',
-  imports: [MatButtonModule, PageHeader, RouterLink],
+  imports: [MaintenanceBoard, MatButtonModule, PageHeader, RouterLink, ServiceDueSoon],
   template: `
-    <app-page-header title="Maintenance">
+    <app-page-header title="Maintenance" subtitle="Defects, interventions, parts and costs">
       <a mat-flat-button routerLink="/maintenance/report">Report defect</a>
     </app-page-header>
-    <section class="card">
-      <div class="empty-state">
-        <span class="material-symbols-rounded" aria-hidden="true">construction</span>
-        <p>Not implemented yet. See the GitHub issues labelled mod:maintenance.</p>
-      </div>
-    </section>
+    <app-service-due-soon #due />
+    <app-maintenance-board (statusChanged)="due.load()" />
+  `,
+  styles: `
+    app-service-due-soon {
+      display: block;
+      margin-bottom: var(--space-5);
+    }
   `,
 })
 export class MaintenancePage {}
