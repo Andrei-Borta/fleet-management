@@ -153,10 +153,10 @@ export interface InterventionDialogData {
       gap: var(--space-2);
       margin-top: var(--space-3);
       mat-form-field {
-        flex: 1 1 160px;
+        flex: 1 1 calc(var(--space-6) * 5);
       }
       .small {
-        flex: 0 1 120px;
+        flex: 0 1 calc(var(--space-7) * 3);
       }
     }
     .total {
