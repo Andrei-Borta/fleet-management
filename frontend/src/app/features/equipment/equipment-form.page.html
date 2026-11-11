@@ -1,0 +1,96 @@
+<app-page-header [title]="id ? 'Edit equipment' : 'Add equipment'" />
+
+<section class="card" [attr.aria-busy]="loading() || saving()">
+  @if (loading() || saving()) {
+    <mat-progress-bar
+      mode="indeterminate"
+      [attr.aria-label]="loading() ? 'Loading equipment' : 'Saving equipment'"
+    />
+  }
+  @if (failed()) {
+    <div class="empty-state">
+      <span class="material-symbols-rounded" aria-hidden="true">error</span>
+      <p>Equipment could not be loaded.</p>
+      <button mat-stroked-button (click)="load()">Retry</button>
+      <a mat-button routerLink="/equipment">Back to equipment</a>
+    </div>
+  } @else if (!loading()) {
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Name</mat-label>
+          <input matInput formControlName="name" required maxlength="200" />
+          <mat-error>Enter an equipment name.</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Type</mat-label>
+          <input matInput formControlName="type" required maxlength="100" />
+          <mat-error>Enter an equipment type.</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Serial number</mat-label>
+          <input matInput formControlName="serial_no" required maxlength="100" />
+          <mat-error>Enter a serial number.</mat-error>
+        </mat-form-field>
+        @if (form.controls.status.value !== null) {
+          <mat-form-field appearance="outline">
+            <mat-label>Status</mat-label>
+            <mat-select formControlName="status">
+              <mat-option value="available">Available</mat-option>
+              <mat-option value="retired">Retired</mat-option>
+            </mat-select>
+          </mat-form-field>
+        } @else if (original(); as equipment) {
+          <p>Current status <app-status-badge [status]="equipment.status" /></p>
+        }
+        <mat-form-field appearance="outline">
+          <mat-label>Engine hours</mat-label>
+          <input
+            matInput
+            type="number"
+            min="0"
+            step="0.01"
+            formControlName="engine_hours"
+            required
+          />
+          <mat-error>Enter non-negative hours with up to two decimal places.</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Hourly cost (RON)</mat-label>
+          <input
+            matInput
+            type="number"
+            min="0"
+            step="0.01"
+            formControlName="hourly_cost"
+            required
+          />
+          <mat-error>Enter a non-negative cost with up to two decimal places.</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Service interval (days)</mat-label>
+          <input matInput type="number" min="1" step="1" formControlName="service_interval_days" />
+          <mat-error>Enter a positive whole number of days.</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Service interval (hours)</mat-label>
+          <input
+            matInput
+            type="number"
+            min="0.01"
+            step="0.01"
+            formControlName="service_interval_hours"
+          />
+          <mat-error>Enter positive hours with up to two decimal places.</mat-error>
+        </mat-form-field>
+      </div>
+      @if (saveError()) {
+        <p class="form-error" role="alert">{{ saveError() }}</p>
+      }
+      <div class="form-actions">
+        <a mat-button [routerLink]="id ? ['/equipment', id] : ['/equipment']">Cancel</a>
+        <button mat-flat-button type="submit" data-testid="save-equipment" [disabled]="saving()">Save</button>
+      </div>
+    </form>
+  }
+</section>

@@ -28,6 +28,24 @@ export const routes: Routes = [
     loadComponent: () => import('./features/equipment/equipment.page').then((m) => m.EquipmentPage),
   },
   {
+    path: 'equipment/new',
+    title: 'Add equipment',
+    loadComponent: () =>
+      import('./features/equipment/equipment-form.page').then((m) => m.EquipmentFormPage),
+  },
+  {
+    path: 'equipment/:id/edit',
+    title: 'Edit equipment',
+    loadComponent: () =>
+      import('./features/equipment/equipment-form.page').then((m) => m.EquipmentFormPage),
+  },
+  {
+    path: 'equipment/:id',
+    title: 'Equipment details',
+    loadComponent: () =>
+      import('./features/equipment/equipment-detail.page').then((m) => m.EquipmentDetailPage),
+  },
+  {
     path: 'sites',
     title: 'Sites',
     loadComponent: () => import('./features/sites/sites.page').then((m) => m.SitesPage),
