@@ -23,7 +23,7 @@
     @if (conflict(); as issue) {
     <section class="conflict" aria-labelledby="conflict-heading">
       <h2 id="conflict-heading">Equipment unavailable</h2>
-      @if (issue.conflicts?.length) {
+      @if (issue.conflicts.length) {
         <div role="alert">
           <ul class="conflict-list" aria-label="Conflicts">
             @for (item of issue.conflicts; track item.kind + '-' + item.id) {
@@ -43,7 +43,7 @@
       } @else {
         <p class="conflict-reason" role="alert"><strong>Conflict:</strong> {{ issue.detail }}</p>
       }
-      @if (issue.alternatives?.length) {
+      @if (issue.alternatives.length) {
         <h3 class="alternatives-heading">Choose another available machine from below.</h3>
         <ul class="alternatives" aria-label="Alternative equipment">
           @for (alternative of issue.alternatives; track alternative.id) {
@@ -79,7 +79,7 @@
     }
     @if (conflict(); as issue) {
       <div class="form-conflict" role="alert">
-        @if (issue.conflicts?.length) {
+        @if (issue.conflicts.length) {
           @for (item of issue.conflicts; track item.kind + '-' + item.id) {
             <p>
               <strong>Conflict:</strong> This equipment is
@@ -124,13 +124,12 @@
               required
               class="equipment-trigger"
               role="combobox"
-              [disabled]="saving()"
+              [formControl]="equipmentDisplay"
               [errorStateMatcher]="equipmentMatcher"
               aria-label="Equipment"
               aria-haspopup="dialog"
               aria-controls="equipment-picker"
               [attr.aria-expanded]="pickerOpen()"
-              [value]="selectedEquipment()?.name || ''"
               (click)="pickerOpen.set(true)"
               (keydown.enter)="pickerOpen.set(true); $event.preventDefault()"
               (keydown.space)="pickerOpen.set(true); $event.preventDefault()"

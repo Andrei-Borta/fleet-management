@@ -121,6 +121,29 @@ test('prompts for changes on the form when no alternatives exist', async ({ page
   await expect(page.getByRole('button', { name: 'Edit request' })).toHaveCount(0);
 });
 
+for (const width of [375, 1440]) {
+  test(`conflict alternatives fit at ${width}px in light and dark mode`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.route('**/api/v1/reservations', (route) => route.fulfill({ status: 409, json: {
+      detail: 'Equipment is already booked',
+      conflicts: [{ kind: 'reservation', id: 1, start_date: '2026-11-10', end_date: '2026-11-20', status: 'approved' }],
+      alternatives: [{ id: 3, name: 'Alternative excavator', type: 'excavator', status: 'available', hourly_cost: 80 }],
+    } }));
+    await page.goto('/reservations/new?site_id=42');
+    await page.getByLabel('Start date').fill('2026-11-12');
+    await page.getByLabel('End date').fill('2026-11-14');
+    await page.getByRole('combobox', { name: 'Equipment', exact: true }).click();
+    await page.getByRole('button', { name: /CAT 320/ }).click();
+    await page.getByRole('button', { name: 'Submit request' }).click();
+    await expect(page.getByRole('button', { name: 'Request Alternative excavator' })).toBeVisible();
+    for (const theme of ['light', 'dark']) {
+      if (theme === 'dark') await page.getByTestId('theme-toggle').click();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.screenshot({ path: `test-results/reservation-conflict-${width}-${theme}.png`, fullPage: true });
+    }
+  });
+}
+
 test('shows a spinner while sending a request and returns to the form after an error', async ({ page }) => {
   let release: () => void = () => undefined;
   const pending = new Promise<void>((resolve) => { release = resolve; });

@@ -77,7 +77,7 @@ export class ReservationFormPage {
   protected readonly pickerOpen = signal(false);
   protected readonly search = signal('');
   protected readonly category = signal('');
-  protected readonly selectedEquipment = signal<Pick<Equipment, 'id' | 'name'> | null>(null);
+  protected readonly equipmentDisplay = this.fb.nonNullable.control('');
   protected readonly availability = signal<'unknown' | 'loading' | 'ready' | 'failed'>('unknown');
   private readonly availableIds = signal<Set<number>>(new Set());
   private readonly retryAvailability = new Subject<void>();
@@ -204,7 +204,7 @@ export class ReservationFormPage {
     if (this.saving() || item.status === 'retired') return;
     this.form.controls.equipment_id.setValue(item.id);
     this.form.controls.equipment_id.markAsTouched();
-    this.selectedEquipment.set(item);
+    this.equipmentDisplay.setValue(item.name);
     this.closePicker();
   }
 
@@ -230,10 +230,12 @@ export class ReservationFormPage {
     this.saving.set(true);
     this.pickerOpen.set(false);
     this.form.disable({ emitEvent: false });
+    this.equipmentDisplay.disable({ emitEvent: false });
     this.api.create(request).pipe(
       takeUntilDestroyed(this.destroyRef),
       finalize(() => {
         this.form.enable({ emitEvent: false });
+        this.equipmentDisplay.enable({ emitEvent: false });
         if (this.requestedSite && !this.invalidSiteLink()) {
           this.form.controls.site_id.disable({ emitEvent: false });
         }
@@ -246,7 +248,11 @@ export class ReservationFormPage {
       },
       error: (error: unknown) => {
         const conflict = asConflict<ReservationConflictBody>(error);
-        if (conflict) this.conflict.set(conflict);
+        if (conflict) this.conflict.set({
+          ...conflict,
+          conflicts: conflict.conflicts ?? [],
+          alternatives: conflict.alternatives ?? [],
+        });
         else this.saveFailed.set(true);
       },
     });
@@ -255,7 +261,7 @@ export class ReservationFormPage {
   protected chooseAlternative(alternative: AlternativeEquipment): void {
     if (this.saving()) return;
     this.form.controls.equipment_id.setValue(alternative.id);
-    this.selectedEquipment.set(alternative);
+    this.equipmentDisplay.setValue(alternative.name);
     this.submit();
   }
 }
