@@ -1,9 +1,9 @@
 import { DOCUMENT } from '@angular/common';
 import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { RouterLink } from '@angular/router';
 import {
   ArcElement,
   BarController,
@@ -19,6 +19,7 @@ import {
 import { BaseChartDirective, provideCharts } from 'ng2-charts';
 import { finalize } from 'rxjs';
 
+import { RoleService } from '../../core/role.service';
 import { ThemeService } from '../../core/theme.service';
 import { PageHeader } from '../../shared/page-header/page-header';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
@@ -33,15 +34,18 @@ const LOAD_ANIMATION_MS = 600;
 @Component({
   selector: 'app-dashboard-page',
   imports: [
-    PageHeader, StatusBadge, MatButtonModule, MatButtonToggleModule,
-    MatProgressBarModule, BaseChartDirective, PendingRequestsWidget, ServiceDueWidget, RouterLink,
+    PageHeader, StatusBadge, MatButtonModule, MatButtonToggleModule, RouterLink,
+    MatProgressBarModule, BaseChartDirective, PendingRequestsWidget, ServiceDueWidget,
   ],
   providers: [provideCharts({
     registerables: [ArcElement, BarController, BarElement, CategoryScale, DoughnutController, LinearScale, Tooltip],
   })],
   template: `
     <app-page-header title="Dashboard" subtitle="Fleet overview">
-      <a mat-flat-button routerLink="/reservations/new">New reservation</a>
+      <a mat-stroked-button routerLink="/dashboard/costs">Site costs</a>
+      @if (roles.can('reservations.request')) {
+        <a mat-flat-button routerLink="/reservations/new">New reservation</a>
+      }
     </app-page-header>
     <section aria-label="Fleet overview" [attr.aria-busy]="loading()">
       @if (loading() && !fleet()) {
@@ -153,6 +157,7 @@ const LOAD_ANIMATION_MS = 600;
 })
 export class DashboardPage {
   private readonly api = inject(DashboardService);
+  protected readonly roles = inject(RoleService);
   private readonly document = inject(DOCUMENT);
   private readonly theme = inject(ThemeService);
   private readonly destroyRef = inject(DestroyRef);

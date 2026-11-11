@@ -1,5 +1,10 @@
-import { isDevMode } from '@angular/core';
+import { inject, isDevMode } from '@angular/core';
 import { Routes } from '@angular/router';
+
+import { RoleService, roleGuard } from './core/role.service';
+
+/** Each role lands on its own page (core/role.service.ts). */
+const roleHome = () => inject(RoleService).home();
 
 /** Dev-only pages. Not registered in production builds. */
 const devRoutes: Routes = [
@@ -10,8 +15,13 @@ const devRoutes: Routes = [
   },
 ];
 
-export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+/** Pages each role may visit, checked by `roleGuard`; dev pages are left out. */
+const featureRoutes: Routes = [
+  {
+    path: 'dashboard/costs',
+    title: 'Site costs',
+    loadComponent: () => import('./features/dashboard/costs.page').then((m) => m.CostsPage),
+  },
   {
     path: 'dashboard',
     title: 'Dashboard',
@@ -63,6 +73,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/calendar/calendar.page').then((m) => m.CalendarPage),
   },
   {
+    path: 'maintenance/report',
+    title: 'Report defect',
+    loadComponent: () =>
+      import('./features/maintenance/defect-report.page').then((m) => m.DefectReportPage),
+  },
+  {
     path: 'maintenance',
     title: 'Maintenance',
     loadComponent: () =>
@@ -74,7 +90,6 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/operations/operations.page').then((m) => m.OperationsPage),
   },
-  ...(isDevMode() ? devRoutes : []),
   {
     path: 'sites/new',
     title: 'Add site',
@@ -90,5 +105,11 @@ export const routes: Routes = [
     title: 'Site details',
     loadComponent: () => import('./features/sites/site-detail.page').then((m) => m.SiteDetailPage),
   },
-  { path: '**', redirectTo: 'dashboard' },
+];
+
+export const routes: Routes = [
+  { path: '', pathMatch: 'full', redirectTo: roleHome },
+  ...(isDevMode() ? devRoutes : []),
+  { path: '', canActivateChild: [roleGuard], children: featureRoutes },
+  { path: '**', redirectTo: roleHome },
 ];

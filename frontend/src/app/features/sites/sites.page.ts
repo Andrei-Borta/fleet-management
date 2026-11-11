@@ -8,6 +8,7 @@ import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
+import { RoleService } from '../../core/role.service';
 import { PageHeader } from '../../shared/page-header/page-header';
 import { Site } from './sites.models';
 import { SitesService } from './sites.service';
@@ -29,6 +30,7 @@ import { SitesService } from './sites.service';
 })
 export class SitesPage {
   private readonly service = inject(SitesService);
+  protected readonly roles = inject(RoleService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly paginator = viewChild(MatPaginator);
 
