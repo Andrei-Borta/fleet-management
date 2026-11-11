@@ -91,3 +91,46 @@ test('opens from maintenance and keeps a failed report available for retry', asy
   await page.getByRole('button', { name: 'Cancel' }).click();
   await expect(page).toHaveURL(/\/maintenance$/);
 });
+
+for (const status of ['in_service', 'retired'] as const) {
+  test(`shows the actual ${status} status after a critical report`, async ({ page }) => {
+    const item = { ...equipment, status };
+    await page.route('**/api/v1/equipment', (route) => route.fulfill({ json: [item] }));
+    await page.route('**/api/v1/equipment/12', (route) => route.fulfill({ json: item }));
+    await page.route('**/api/v1/maintenance/defects', (route) => route.fulfill({
+      status: 201,
+      json: {
+        id: 1, equipment_id: item.id, description: 'Brake failure', severity: 'critical',
+        status: 'open', reported_at: '2026-11-11T10:00:00Z', resolved_at: null,
+      },
+    }));
+    await page.goto('/equipment/12');
+    await page.getByRole('link', { name: 'Report defect' }).click();
+    await page.getByRole('textbox', { name: 'Description' }).fill('Brake failure');
+    await page.getByRole('combobox', { name: 'Severity' }).click();
+    await page.getByRole('option', { name: 'Critical' }).click();
+    await page.getByRole('button', { name: 'Report defect' }).click();
+    await expect(page).toHaveURL(/\/equipment\/12$/);
+    await expect(page.getByText(status === 'in_service' ? 'In service' : 'Retired', { exact: true })).toBeVisible();
+  });
+}
+
+for (const width of [375, 1440]) {
+  test(`defect form and equipment picker fit at ${width}px in light and dark mode`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.route('**/api/v1/equipment', (route) => route.fulfill({ json: [equipment] }));
+    await page.goto('/maintenance/report');
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate((value) => document.documentElement.dataset['theme'] = value, theme);
+      await page.getByRole('combobox', { name: 'Equipment' }).click();
+      const picker = page.getByRole('dialog', { name: 'Choose equipment' });
+      await expect(picker).toBeVisible();
+      const bounds = await picker.boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      await page.keyboard.press('Escape');
+    }
+  });
+}

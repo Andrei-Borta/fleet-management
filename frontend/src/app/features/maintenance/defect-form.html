@@ -27,7 +27,7 @@
         <ng-template cdkConnectedOverlay [cdkConnectedOverlayOrigin]="overlayOrigin"
           [cdkConnectedOverlayOpen]="pickerOpen()" [cdkConnectedOverlayHasBackdrop]="true"
           cdkConnectedOverlayBackdropClass="cdk-overlay-transparent-backdrop"
-          [cdkConnectedOverlayWidth]="'min(35rem, calc(100vw - 2rem))'" (attach)="focusSearch()"
+          [cdkConnectedOverlayWidth]="'min(35rem, calc(100vw - 4rem))'" (attach)="focusSearch()"
           (backdropClick)="closePicker()" (overlayKeydown)="$event.key === 'Escape' && closePicker()">
           <section class="equipment-popover" id="defect-equipment-picker" role="dialog" aria-label="Choose equipment">
             <div class="equipment-filters">

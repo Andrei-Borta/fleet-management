@@ -1,5 +1,5 @@
 import { OverlayModule } from '@angular/cdk/overlay';
-import { Component, computed, DestroyRef, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, computed, DestroyRef, ElementRef, inject, input, OnInit, output, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -74,7 +74,7 @@ import { MaintenanceService } from './maintenance.service';
     }
   `,
 })
-export class DefectForm {
+export class DefectForm implements OnInit {
   private readonly equipmentService = inject(EquipmentService);
   private readonly maintenanceService = inject(MaintenanceService);
   private readonly notifications = inject(NotificationService);
