@@ -1,0 +1,47 @@
+<div [attr.aria-busy]="loading() || saving()">
+  @if (loading() || saving()) {
+    <mat-progress-bar mode="indeterminate" [attr.aria-label]="loading() ? 'Loading equipment' : 'Reporting defect'" />
+  }
+  @if (failed()) {
+    <div class="empty-state">
+      <p>Equipment could not be loaded.</p>
+      <button mat-stroked-button type="button" (click)="loadEquipment()">Retry</button>
+      <button mat-button type="button" (click)="cancelled.emit()">Cancel</button>
+    </div>
+  } @else if (!loading()) {
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <div class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Equipment</mat-label>
+          <mat-select formControlName="equipment_id" required data-testid="defect-equipment">
+            @for (item of equipment(); track item.id) {
+              <mat-option [value]="item.id">{{ item.name }} ({{ item.serial_no }})</mat-option>
+            }
+          </mat-select>
+          <mat-error>Select equipment.</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Severity</mat-label>
+          <mat-select formControlName="severity" required data-testid="defect-severity">
+            <mat-option value="low">Low</mat-option>
+            <mat-option value="medium">Medium</mat-option>
+            <mat-option value="critical">Critical</mat-option>
+          </mat-select>
+          <mat-error>Select a severity.</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Description</mat-label>
+          <textarea matInput formControlName="description" required maxlength="2000" data-testid="defect-description"></textarea>
+          <mat-error>Enter a description of up to 2,000 characters.</mat-error>
+        </mat-form-field>
+      </div>
+      @if (conflict()) {
+        <p class="form-error" role="alert">{{ conflict() }}</p>
+      }
+      <div class="form-actions">
+        <button mat-button type="button" [disabled]="saving()" (click)="cancelled.emit()">Cancel</button>
+        <button mat-flat-button type="submit" data-testid="submit-defect" [disabled]="saving()">Report defect</button>
+      </div>
+    </form>
+  }
+</div>
