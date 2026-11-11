@@ -9,6 +9,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 
+from app.core.deps import Role
 from app.core.errors import ConflictError, InvalidDataError, NotFoundError
 from app.modules.equipment import service as equipment_service
 from app.modules.equipment.models import Equipment, EquipmentStatus
@@ -36,6 +37,7 @@ from app.modules.maintenance.schemas import (
     PartCreate,
     PartRead,
 )
+from app.modules.notifications.service import notify
 from app.modules.reservations.service import find_conflicts
 
 DEFAULT_WITHIN_DAYS = 7
@@ -106,6 +108,15 @@ def list_defects(
     return list(db.scalars(query).all())
 
 
+def announce_defect(db: Session, defect: Defect) -> None:
+    """Notify the mechanics and the fleet manager of a new defect. Does not commit."""
+    equipment = db.get(Equipment, defect.equipment_id)
+    title = f"Defect reported: {equipment.name}"
+    body = f"{defect.severity.value.capitalize()} severity: {defect.description}"
+    for role in (Role.MECHANIC, Role.FLEET_MANAGER):
+        notify(db, role, title, body, "/maintenance")
+
+
 def report_defect(db: Session, data: DefectCreate) -> Defect:
     """Record an open defect, then recompute status in the same transaction.
 
@@ -118,6 +129,7 @@ def report_defect(db: Session, data: DefectCreate) -> Defect:
     # autoflush is off, so the new row must be visible before status is recomputed.
     db.flush()
     recompute_status(db, data.equipment_id)
+    announce_defect(db, defect)
     db.commit()
     db.refresh(defect)
     return defect
