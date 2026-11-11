@@ -4,7 +4,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { finalize } from 'rxjs';
+import { finalize, forkJoin } from 'rxjs';
 
 import { PageHeader } from '../../shared/page-header/page-header';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
@@ -57,6 +57,7 @@ export class SiteDetailPage {
   );
   protected readonly site = signal<Site | null>(null);
   protected readonly reservations = signal<Reservation[]>([]);
+  private readonly equipmentNames = signal<Map<number, string>>(new Map());
   protected readonly loading = signal(false);
   protected readonly failed = signal(false);
   protected readonly loadingReservations = signal(false);
@@ -87,15 +88,24 @@ export class SiteDetailPage {
   protected loadReservations(): void {
     this.loadingReservations.set(true);
     this.reservationsFailed.set(false);
-    this.service
-      .reservations(this.id)
+    forkJoin({
+      reservations: this.service.reservations(this.id),
+      equipment: this.service.equipment(),
+    })
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.loadingReservations.set(false)),
       )
       .subscribe({
-        next: (reservations) => this.reservations.set(reservations),
+        next: ({ reservations, equipment }) => {
+          this.reservations.set(reservations);
+          this.equipmentNames.set(new Map(equipment.map((item) => [item.id, item.name])));
+        },
         error: () => this.reservationsFailed.set(true),
       });
+  }
+
+  protected equipmentName(id: number): string {
+    return this.equipmentNames().get(id) ?? `Equipment #${id}`;
   }
 }
