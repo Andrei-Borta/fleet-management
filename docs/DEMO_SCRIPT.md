@@ -33,7 +33,7 @@ behaves the same in the dry run and the recording.
   realistic, and every must-have scene has data that reproduces from a fresh database.
 - The seed uses fixed dates in November 2026. After about 20 Nov the *Reserved* count, utilization and
   the current calendar week empty out, so recordings after that date need the seed to move with the
-  run date.
-- No usage hours or fuel logs are seeded, so the operator's history (OPS-02) starts empty.
+  run date ([#90](https://github.com/Andrei-Borta/fleet-management/issues/90)).
+- No usage hours or fuel logs are seeded, so the operator's history (OPS-02) starts empty ([#91](https://github.com/Andrei-Borta/fleet-management/issues/91)).
 - CAT D6 Bulldozer is overdue for service but holds an approved booking until 14 Nov, which
-  contradicts the auto-block story if someone opens it during the demo.
+  contradicts the auto-block story if someone opens it during the demo ([#92](https://github.com/Andrei-Borta/fleet-management/issues/92)).
