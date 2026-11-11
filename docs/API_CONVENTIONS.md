@@ -79,3 +79,13 @@
   interval or its last-service reading is not set. Overdue rows come first. This only reports: it does not
   change the equipment status.
 - `POST /operations/checklists` records an operator daily safety checklist (`equipment_id`, `date`, `items: [{name, ok, critical}]`). If any critical item fails (`ok` is `false` and `critical` is `true`), an open critical defect is created and the equipment is auto-blocked to `defective` (unless retired or in service). `GET /operations/checklists?equipment_id=&date=` lists checklists with optional equipment and date filters.
+- `GET /notifications?unread=` lists the feed of the role in `X-Role`, newest first (at most 50);
+  `unread=true` keeps only unread ones. Each item is `{id, role, title, body, link, created_at, read_at}`;
+  `link` is an app route to open on click and `read_at` is `null` while unread. Notifications are created
+  by the events themselves: an approved or rejected reservation notifies `site_manager` (link
+  `/reservations`); a reported defect, including one from a failed critical checklist item, notifies
+  `mechanic` and `fleet_manager` (link `/maintenance`); a machine overdue or due for service within
+  7 days or 50 engine hours notifies `fleet_manager` once per service cycle (link `/equipment/{id}`),
+  checked when the fleet manager loads the feed. `POST /notifications/{id}/read` marks one as read
+  (`404` if it is missing or belongs to another role; reading it again keeps the first time).
+  `POST /notifications/read-all` marks the role's unread notifications as read and returns `{marked}`.
