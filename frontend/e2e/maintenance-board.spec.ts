@@ -205,6 +205,8 @@ test('adds parts and labour and shows the total cost', async ({ page }) => {
   await dialog.getByRole('button', { name: 'Add part' }).click();
   await expect(dialog.getByTestId('parts-table')).toContainText('Hydraulic hose');
   await expect(dialog.getByLabel('Part name')).toHaveValue('');
+  await expect(dialog.getByText('Enter a part name.')).toHaveCount(0);
+  await expect(dialog.getByLabel('Unit cost (RON)')).toHaveValue('');
 
   await dialog.getByLabel('Hours').fill('3');
   await dialog.getByLabel('Rate (RON/h)').fill('100');
@@ -295,4 +297,35 @@ test('explains invalid parts and labour inline', async ({ page }) => {
   await dialog.getByLabel('Hours').fill('-1');
   await dialog.getByRole('button', { name: 'Save labour' }).click();
   await expect(dialog.getByText('Enter 0 or more hours.')).toBeVisible();
+});
+
+test('Enter in the part name moves to the quantity instead of adding the part', async ({ page }) => {
+  await mockApi(page);
+  let posts = 0;
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && request.url().includes('/parts')) posts += 1;
+  });
+  await page.goto('/maintenance');
+  await page.getByRole('button', { name: 'Parts and labour for intervention 10' }).click();
+  const dialog = page.getByRole('dialog');
+
+  await dialog.getByLabel('Part name').fill('Brake pad set');
+  await dialog.getByLabel('Part name').press('Enter');
+
+  await expect(dialog.getByLabel('Qty')).toBeFocused();
+  await expect(dialog.getByLabel('Part name')).toHaveValue('Brake pad set');
+  await expect(dialog.getByText('Enter a part name.')).toHaveCount(0);
+  expect(posts).toBe(0);
+
+  // Enter on the quantity without a unit cost asks for the cost instead of saving 0 RON.
+  await dialog.getByLabel('Qty').fill('2');
+  await dialog.getByLabel('Qty').press('Enter');
+  await expect(dialog.getByText('Enter a unit cost of 0 or more.')).toBeVisible();
+  expect(posts).toBe(0);
+
+  await dialog.getByLabel('Unit cost (RON)').fill('350');
+  await dialog.getByLabel('Unit cost (RON)').press('Enter');
+  await expect(dialog.getByTestId('parts-table')).toContainText('Brake pad set');
+  expect(posts).toBe(1);
+  await expect(dialog.getByText('Enter a part name.')).toHaveCount(0);
 });
