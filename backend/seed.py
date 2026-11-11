@@ -6,11 +6,14 @@ Run from ``backend/``:
     python seed.py --reset    # wipe all fleet data and insert a fresh demo set
 
 The data is deterministic so every scene from ``docs/DEMO_SCRIPT.md`` can be
-reproduced from an empty database.
+reproduced from an empty database. All dates below are written as of ``ANCHOR``
+(the day before the demo) and shifted by the days between ``ANCHOR`` and the run
+date, so bookings, repairs and service due dates keep the same meaning whenever
+the seed runs.
 """
 
 import argparse
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import delete, select
@@ -32,6 +35,9 @@ from app.modules.reservations.models import Reservation, ReservationStatus
 from app.modules.sites.models import Site
 
 SERIAL_PREFIX = "DEMO-"
+
+# "Today" in the data below. Every date is moved by (run date - ANCHOR).
+ANCHOR = date(2026, 11, 11)
 
 
 def _dt(year: int, month: int, day: int, hour: int = 8) -> datetime:
@@ -236,7 +242,8 @@ EQUIPMENT = [
         "210.00",
         180,
         "600.00",
-        _dt(2026, 4, 10),
+        # Serviced in September: it holds an approved booking, so it must not be overdue.
+        _dt(2026, 9, 10),
         "1300.00",
         EquipmentStatus.AVAILABLE,
     ),
@@ -500,6 +507,18 @@ INTERVENTIONS = [
     ),
 ]
 
+# Daily hours and fuel on the approved bookings that already started, up to yesterday.
+# equipment suffix, site name, first day, last day, hours per day, litres per hour.
+# Sundays are skipped. Totals stay below the engine hours logged since the last service.
+USAGE = [
+    ("CRA-02", "Dambovita Bridge", date(2026, 10, 26), date(2026, 10, 29), "6.00", "11.0"),
+    ("BUL-01", "A1 Highway Section 4", date(2026, 11, 2), date(2026, 11, 10), "7.50", "22.0"),
+    ("CRA-01", "Dambovita Bridge", date(2026, 11, 5), date(2026, 11, 10), "6.50", "12.0"),
+    ("LOA-01", "Pipera Business Park", date(2026, 11, 9), date(2026, 11, 10), "8.00", "13.0"),
+    ("EXC-01", "North Ring Road", date(2026, 11, 10), date(2026, 11, 10), "7.00", "15.0"),
+    ("COM-01", "A1 Highway Section 4", date(2026, 11, 10), date(2026, 11, 10), "6.00", "8.0"),
+]
+
 PARTS = [
     ("loader-repair", 'Hydraulic hose 3/4"', 1, "450.00"),
     ("loader-repair", "Hydraulic fittings", 2, "35.00"),
@@ -525,6 +544,11 @@ def _clear(session: Session) -> None:
     session.flush()
 
 
+def _usage_days(first: date, last: date) -> list[date]:
+    days = (first + timedelta(days=n) for n in range((last - first).days + 1))
+    return [day for day in days if day.weekday() != 6]
+
+
 def _already_seeded(session: Session) -> bool:
     return (
         session.scalar(
@@ -534,14 +558,30 @@ def _already_seeded(session: Session) -> bool:
     )
 
 
-def seed(session: Session, *, reset: bool = False) -> dict[str, int]:
-    """Insert the demo dataset. Returns the number of rows written per entity."""
+def seed(session: Session, *, reset: bool = False, today: date | None = None) -> dict[str, int]:
+    """Insert the demo dataset. Returns the number of rows written per entity.
+
+    ``today`` defaults to the current date; every seeded date moves with it (see ``ANCHOR``).
+    """
+    offset = (today or date.today()) - ANCHOR
+
+    def day(value: date) -> date:
+        return value + offset
+
+    def moment(value: datetime | None) -> datetime | None:
+        return None if value is None else value + offset
+
     if reset:
         _clear(session)
     elif _already_seeded(session):
         return {}
 
-    sites = {data["name"]: Site(**data) for data in SITES}
+    sites = {
+        data["name"]: Site(
+            **{**data, "start_date": day(data["start_date"]), "end_date": day(data["end_date"])}
+        )
+        for data in SITES
+    }
     session.add_all(sites.values())
     session.flush()
 
@@ -568,7 +608,7 @@ def seed(session: Session, *, reset: bool = False) -> dict[str, int]:
             hourly_cost=Decimal(hourly_cost),
             service_interval_days=interval_days,
             service_interval_hours=Decimal(interval_hours),
-            last_service_at=last_service_at,
+            last_service_at=moment(last_service_at),
             last_service_hours=Decimal(last_service_hours),
         )
     session.add_all(equipment.values())
@@ -578,8 +618,8 @@ def seed(session: Session, *, reset: bool = False) -> dict[str, int]:
         Reservation(
             equipment_id=equipment[suffix].id,
             site_id=sites[site_name].id,
-            start_date=start,
-            end_date=end,
+            start_date=day(start),
+            end_date=day(end),
             status=status,
             requested_by_role="site_manager",
         )
@@ -594,8 +634,8 @@ def seed(session: Session, *, reset: bool = False) -> dict[str, int]:
             description=data["description"],
             severity=data["severity"],
             status=data["status"],
-            reported_at=data["reported_at"],
-            resolved_at=data["resolved_at"],
+            reported_at=moment(data["reported_at"]),
+            resolved_at=moment(data["resolved_at"]),
         )
         defects[data["key"]] = defect
     session.add_all(defects.values())
@@ -620,10 +660,10 @@ def seed(session: Session, *, reset: bool = False) -> dict[str, int]:
             defect_id=defects[defect_key].id if defect_key else None,
             description=description,
             kind=kind,
-            scheduled_date=scheduled_date,
+            scheduled_date=day(scheduled_date),
             status=status,
-            started_at=started_at,
-            completed_at=completed_at,
+            started_at=moment(started_at),
+            completed_at=moment(completed_at),
             labor_hours=Decimal(labor_hours),
             labor_rate=Decimal(labor_rate),
         )
@@ -641,6 +681,19 @@ def seed(session: Session, *, reset: bool = False) -> dict[str, int]:
         for key, name, qty, unit_cost in PARTS
     ]
     session.add_all(parts)
+
+    usage = [
+        UsageLog(
+            equipment_id=equipment[suffix].id,
+            site_id=sites[site_name].id,
+            date=day(worked),
+            hours=Decimal(hours),
+            fuel_liters=Decimal(hours) * Decimal(litres_per_hour),
+        )
+        for suffix, site_name, first, last, hours, litres_per_hour in USAGE
+        for worked in _usage_days(first, last)
+    ]
+    session.add_all(usage)
     session.commit()
 
     return {
@@ -650,6 +703,7 @@ def seed(session: Session, *, reset: bool = False) -> dict[str, int]:
         "defects": len(defects),
         "interventions": len(interventions),
         "parts": len(parts),
+        "usage_logs": len(usage),
     }
 
 

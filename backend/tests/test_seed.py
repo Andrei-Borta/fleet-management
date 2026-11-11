@@ -1,6 +1,6 @@
 """The demo seed is deterministic, idempotent and matches the demo scenario."""
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
@@ -15,9 +15,11 @@ from app.modules.maintenance.models import (
     InterventionStatus,
     ServiceIntervention,
 )
+from app.modules.maintenance.rules import is_service_due
+from app.modules.operations.models import UsageLog
 from app.modules.reservations.models import Reservation, ReservationStatus
 from app.modules.sites.models import Site
-from seed import seed
+from seed import ANCHOR, seed
 
 EXPECTED = {
     "sites": 4,
@@ -26,6 +28,7 @@ EXPECTED = {
     "defects": 3,
     "interventions": 3,
     "parts": 4,
+    "usage_logs": 21,
 }
 
 
@@ -41,6 +44,7 @@ def test_seed_creates_the_demo_dataset_and_is_idempotent(db: Session) -> None:
     assert count(db, Reservation) == EXPECTED["reservations"]
     assert count(db, ServiceIntervention) == EXPECTED["interventions"]
     assert count(db, InterventionPart) == EXPECTED["parts"]
+    assert count(db, UsageLog) == EXPECTED["usage_logs"]
 
     # A second run must not duplicate anything.
     assert seed(db) == {}
@@ -114,3 +118,74 @@ def test_seed_reset_removes_existing_fleet_data(db: Session) -> None:
 
     assert count(db, Site) == EXPECTED["sites"]
     assert count(db, Equipment) == EXPECTED["equipment"]
+
+
+def machines_by_serial(db: Session) -> dict[str, Equipment]:
+    return {machine.serial_no: machine for machine in db.scalars(select(Equipment)).all()}
+
+
+def booking_dates(db: Session, machine: Equipment) -> list[tuple[date, date]]:
+    reservations = db.scalars(select(Reservation).where(Reservation.equipment_id == machine.id))
+    return sorted((r.start_date, r.end_date) for r in reservations)
+
+
+def test_seed_dates_move_with_the_run_date(db: Session) -> None:
+    seed(db, reset=True, today=ANCHOR)
+    exc_01 = machines_by_serial(db)["DEMO-EXC-01"]
+    before = booking_dates(db, exc_01)
+    service_before = exc_01.last_service_at
+
+    later = ANCHOR + timedelta(days=45)
+    seed(db, reset=True, today=later)
+    exc_01 = machines_by_serial(db)["DEMO-EXC-01"]
+    after = booking_dates(db, exc_01)
+
+    shift = timedelta(days=45)
+    assert after == [(start + shift, end + shift) for start, end in before]
+    assert exc_01.last_service_at == service_before + shift
+    site = db.scalars(select(Site).where(Site.name == "Pipera Business Park")).one()
+    assert site.start_date == date(2026, 11, 1) + shift
+    assert max(log.date for log in db.scalars(select(UsageLog))) < later
+
+
+def test_seed_service_due_matches_the_bookings_on_any_run_date(db: Session) -> None:
+    for today in (ANCHOR, ANCHOR + timedelta(days=60)):
+        seed(db, reset=True, today=today)
+        machines = machines_by_serial(db)
+        overdue = {serial for serial, machine in machines.items() if is_service_due(machine, today)}
+
+        # CAT D6 holds an approved booking, so it must not be overdue (#92).
+        assert "DEMO-BUL-01" not in overdue
+        # The service-due widget still shows overdue machines.
+        assert {"DEMO-BUL-03", "DEMO-EXC-03"} <= overdue
+        approved_overdue = db.scalars(
+            select(Reservation).where(
+                Reservation.status == ReservationStatus.APPROVED,
+                Reservation.end_date >= today,
+                Reservation.equipment_id.in_([machines[serial].id for serial in overdue]),
+            )
+        ).all()
+        assert approved_overdue == []
+
+
+def test_seed_usage_logs_fit_the_bookings_and_engine_hours(db: Session) -> None:
+    seed(db, reset=True, today=ANCHOR)
+    approved = db.scalars(
+        select(Reservation).where(Reservation.status == ReservationStatus.APPROVED)
+    ).all()
+    logs = db.scalars(select(UsageLog)).all()
+    assert logs
+
+    for log in logs:
+        assert log.date < ANCHOR
+        assert log.hours > 0 and log.fuel_liters > 0
+        assert any(
+            r.equipment_id == log.equipment_id
+            and r.site_id == log.site_id
+            and r.start_date <= log.date <= r.end_date
+            for r in approved
+        ), f"usage log on {log.date} has no matching approved booking"
+
+    for machine in db.scalars(select(Equipment)).all():
+        logged = sum((log.hours for log in logs if log.equipment_id == machine.id), Decimal(0))
+        assert logged <= machine.engine_hours - (machine.last_service_hours or 0)
