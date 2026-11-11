@@ -53,6 +53,7 @@ test('operator logs equipment hours and fuel and sees per-site totals in history
 
   await page.goto('/operations');
   await page.getByTestId('role-switcher').selectOption('operator');
+  await page.getByRole('tab', { name: 'Hours and fuel' }).click();
   await page.getByRole('combobox', { name: 'Equipment', exact: true }).click();
   await page.getByRole('option', { name: equipment.name, exact: true }).click();
   await page.getByRole('combobox', { name: 'Site', exact: true }).click();
@@ -72,7 +73,7 @@ test('operator logs equipment hours and fuel and sees per-site totals in history
   });
   await expect(page.getByText('Usage logged')).toBeVisible();
   await expect(
-    page.getByText('Enter non-negative hours with up to two decimal places.'),
+    page.getByText('Enter 0–24 hours with up to two decimal places.'),
   ).toHaveCount(0);
   await expect(
     page.getByText('Enter non-negative liters with up to two decimal places.'),
@@ -93,4 +94,38 @@ test('operator logs equipment hours and fuel and sees per-site totals in history
   await expect(history.getByRole('row').nth(1)).toContainText('08 Dec 2099');
   await expect(history.getByRole('row').nth(1)).toContainText('7.50');
   await expect(history.getByRole('row').nth(1)).toContainText('23.25');
+});
+test('rejects more than 24 hours a day and keeps the values after a failed save', async ({ page }) => {
+  const equipment = { id: 7, name: 'Loader', type: 'loader', serial_no: 'L-7', status: 'available' };
+  const site = { id: 3, name: 'North', address: 'Main', budget: 1, start_date: '2099-01-01', end_date: '2099-12-31' };
+  let posts = 0;
+  await page.route('**/api/v1/equipment', (route) => route.fulfill({ json: [equipment] }));
+  await page.route('**/api/v1/sites', (route) => route.fulfill({ json: [site] }));
+  await page.route('**/api/v1/operations/usage', (route) => {
+    if (route.request().method() === 'POST') {
+      posts += 1;
+      return route.fulfill({ status: 500, json: { detail: 'Database unavailable' } });
+    }
+    return route.fulfill({ json: { items: [], total_hours: 0, total_fuel_liters: 0 } });
+  });
+
+  await page.goto('/operations');
+  await page.getByRole('tab', { name: 'Hours and fuel' }).click();
+  await page.getByRole('combobox', { name: 'Equipment', exact: true }).click();
+  await page.getByRole('option', { name: 'Loader', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Site', exact: true }).click();
+  await page.getByRole('option', { name: 'North', exact: true }).click();
+  await page.getByLabel('Hours worked').fill('25');
+  await page.getByLabel('Fuel (liters)').fill('40');
+  await page.getByTestId('save-usage').click();
+
+  await expect(page.getByText('Enter 0–24 hours with up to two decimal places.')).toBeVisible();
+  expect(posts).toBe(0);
+
+  await page.getByLabel('Hours worked').fill('8');
+  await page.getByTestId('save-usage').click();
+  await expect(page.getByText('Database unavailable')).toHaveCount(1);
+  expect(posts).toBe(1);
+  await expect(page.getByLabel('Hours worked')).toHaveValue('8');
+  await expect(page.getByLabel('Fuel (liters)')).toHaveValue('40');
 });
