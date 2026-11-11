@@ -12,6 +12,11 @@ test('real API: displays fleet and pending request aggregates', async ({ page })
     const url = new URL(response.url());
     return url.pathname === '/api/v1/reservations' && url.searchParams.get('status') === 'pending';
   });
+  const dueResponse = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === '/api/v1/maintenance/due' &&
+      response.request().method() === 'GET',
+  );
   await page.goto('/dashboard');
   const fleet = await fleetResponse;
   const pending = await pendingResponse;
@@ -35,5 +40,11 @@ test('real API: displays fleet and pending request aggregates', async ({ page })
   } else {
     await expect(widget.locator('.text-display')).toHaveText(String(requests.length));
   }
-  await expect(page.getByRole('region', { name: 'Service due' })).toContainText('coming soon');
+  const dueItems: { name: string }[] = await (await dueResponse).json();
+  const dueWidget = page.getByRole('region', { name: 'Service due' });
+  if (dueItems.length === 0) {
+    await expect(dueWidget).toContainText('No machine needs service');
+  } else {
+    await expect(dueWidget.getByTestId('dashboard-service-due-item').first()).toContainText(dueItems[0].name);
+  }
 });

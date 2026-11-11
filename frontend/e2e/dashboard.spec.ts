@@ -32,18 +32,70 @@ const pendingRequest = {
   note: null,
 };
 
-test.beforeEach(async ({ page }) => {
-  await page.route('**/api/v1/reservations?status=pending', (route) => route.fulfill({ json: [] }));
+const due = (id: number, name: string, overdue: boolean, days: number | null, hours: number | null) => ({
+  equipment_id: id,
+  name,
+  type: 'bulldozer',
+  status: 'available',
+  days_until_due: days,
+  hours_until_due: hours,
+  overdue,
 });
 
-test('shows the service-due placeholder and opens maintenance', async ({ page }) => {
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/reservations?status=pending', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/maintenance/due', (route) => route.fulfill({ json: [] }));
+});
+
+test('lists machines due for service, overdue first, and links to them', async ({ page }) => {
+  await page.route('**/api/v1/dashboard/fleet?*', (route) => route.fulfill({ json: fleet }));
+  await page.route('**/api/v1/maintenance/due', (route) =>
+    route.fulfill({
+      json: [due(8, 'CAT D8 Bulldozer', true, -103, 0), due(3, 'Volvo EC220E', false, 5, 12.5)],
+    }),
+  );
+  await page.route('**/api/v1/equipment/8', (route) =>
+    route.fulfill({ json: { id: 8, name: 'CAT D8 Bulldozer', type: 'bulldozer', status: 'available' } }),
+  );
+  await page.goto('/dashboard');
+  const widget = page.getByRole('region', { name: 'Service due' });
+  const rows = widget.getByTestId('dashboard-service-due-item');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText('CAT D8 Bulldozer');
+  await expect(rows.nth(0)).toContainText('Overdue');
+  await expect(rows.nth(0)).toContainText('103 days overdue · 0 h left');
+  await expect(rows.nth(1)).toContainText('5 days left · 12,5 h left');
+  await expect(rows.nth(1)).not.toContainText('Overdue');
+  await rows.nth(0).getByRole('link', { name: 'CAT D8 Bulldozer' }).click();
+  await expect(page).toHaveURL(/\/equipment\/8$/);
+});
+
+test('service due shows an empty state and opens maintenance', async ({ page }) => {
   await page.route('**/api/v1/dashboard/fleet?*', (route) => route.fulfill({ json: fleet }));
   await page.goto('/dashboard');
   const widget = page.getByRole('region', { name: 'Service due' });
-  await expect(widget.getByText('Service-due information is coming soon.')).toBeVisible();
+  await expect(widget).toContainText('No machine needs service in the next 7 days or 50 engine hours.');
   await widget.getByRole('link', { name: 'View maintenance' }).click();
   await expect(page).toHaveURL(/\/maintenance$/);
   await expect(page.getByRole('heading', { name: 'Maintenance' })).toBeVisible();
+});
+
+test('service due shows at most five machines and retries after an error', async ({ page }) => {
+  await page.route('**/api/v1/dashboard/fleet?*', (route) => route.fulfill({ json: fleet }));
+  let calls = 0;
+  await page.route('**/api/v1/maintenance/due', (route) => {
+    calls += 1;
+    if (calls === 1) return route.fulfill({ status: 500, json: { detail: 'Boom' } });
+    return route.fulfill({
+      json: Array.from({ length: 7 }, (_, i) => due(i + 1, `Machine ${i + 1}`, false, i, null)),
+    });
+  });
+  await page.goto('/dashboard');
+  const widget = page.getByRole('region', { name: 'Service due' });
+  await expect(widget).toContainText('Service due could not be loaded.');
+  await widget.getByRole('button', { name: 'Retry' }).click();
+  await expect(widget.getByTestId('dashboard-service-due-item')).toHaveCount(5);
+  await expect(widget).toContainText('and 2 more');
 });
 
 test('shows pending requests and opens the pending reservations tab', async ({ page }) => {
