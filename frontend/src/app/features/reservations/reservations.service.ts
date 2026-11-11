@@ -4,13 +4,16 @@ import { API_URL } from '../../core/api';
 import { SKIP_ERROR_NOTIFICATION } from '../../core/error.interceptor';
 import { Equipment } from '../equipment/equipment.models';
 import { Site } from '../sites/sites.models';
-import { Reservation } from './reservations.models';
+import { Reservation, ReservationCreate } from './reservations.models';
 
 @Injectable({ providedIn: 'root' })
 export class ReservationsService {
   private readonly http = inject(HttpClient);
   list() {
     return this.http.get<Reservation[]>(`${API_URL}/reservations`);
+  }
+  create(data: ReservationCreate) {
+    return this.http.post<Reservation>(`${API_URL}/reservations`, data);
   }
   sites() {
     return this.http.get<Site[]>(`${API_URL}/sites`);

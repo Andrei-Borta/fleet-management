@@ -1,4 +1,5 @@
 import { OverlayModule } from '@angular/cdk/overlay';
+import { DatePipe } from '@angular/common';
 import { Component, computed, DestroyRef, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
@@ -7,21 +8,25 @@ import { ErrorStateMatcher } from '@angular/material/core';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { catchError, distinctUntilChanged, finalize, forkJoin, map, merge, of, startWith, Subject, switchMap } from 'rxjs';
 
+import { asConflict } from '../../core/api-error';
+import { NotificationService } from '../../core/notification.service';
 import { PageHeader } from '../../shared/page-header/page-header';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
 import { dateRangeErrors, stringField } from '../../shared/validators/date-range';
 import { Equipment } from '../equipment/equipment.models';
 import { Site } from '../sites/sites.models';
+import { AlternativeEquipment, ReservationConflictBody, ReservationCreate } from './reservations.models';
 import { ReservationsService } from './reservations.service';
 
 @Component({
   selector: 'app-reservation-form-page',
   imports: [
-    MatButtonModule, MatFormFieldModule, MatInputModule, MatProgressBarModule, MatSelectModule,
+    DatePipe, MatButtonModule, MatFormFieldModule, MatInputModule, MatProgressBarModule, MatProgressSpinnerModule, MatSelectModule,
     OverlayModule, PageHeader, ReactiveFormsModule, RouterLink, StatusBadge,
   ],
   templateUrl: './reservation-form.page.html',
@@ -31,6 +36,9 @@ import { ReservationsService } from './reservations.service';
     .form-actions { margin-top: var(--space-4); }
     .form-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
     .form-notice { margin-top: 0; }
+    .form-conflict { margin-bottom: var(--space-5); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface-alt); }
+    .form-conflict p { margin: 0; }
+    .form-conflict p + p { margin-top: var(--space-2); }
     .equipment-trigger { cursor: pointer; }
     .equipment-field mat-form-field { width: 100%; }
     .equipment-popover { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); box-shadow: var(--shadow-2); padding: var(--space-3); }
@@ -40,10 +48,21 @@ import { ReservationsService } from './reservations.service';
     .equipment-option:hover, .equipment-option:focus-visible { background: var(--color-surface-alt); }
     .equipment-option:disabled { opacity: 0.55; cursor: not-allowed; }
     .equipment-description { min-width: 0; overflow-wrap: anywhere; }
+    .request-loading { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); padding: var(--space-6); }
+    .conflict h2 { text-align: center; }
+    .conflict-list, .conflict-reason { text-align: center; }
+    .conflict ul { list-style: none; margin: 0; padding: 0; }
+    .conflict-list li + li { margin-top: var(--space-2); }
+    .alternatives-heading { margin: var(--space-6) 0 var(--space-4); text-align: center; }
+    .alternatives { display: grid; gap: var(--space-3); }
+    .alternative { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface-alt); }
+    .conflict-actions { margin-top: var(--space-5); }
   `,
 })
 export class ReservationFormPage {
   private readonly api = inject(ReservationsService);
+  private readonly notifications = inject(NotificationService);
+  private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
   private readonly requestedSite = inject(ActivatedRoute).snapshot.queryParamMap.get('site_id');
@@ -52,10 +71,13 @@ export class ReservationFormPage {
   protected readonly loading = signal(false);
   protected readonly failed = signal(false);
   protected readonly invalidSiteLink = signal(false);
+  protected readonly saving = signal(false);
+  protected readonly saveFailed = signal(false);
+  protected readonly conflict = signal<ReservationConflictBody | null>(null);
   protected readonly pickerOpen = signal(false);
   protected readonly search = signal('');
   protected readonly category = signal('');
-  protected readonly selectedEquipment = signal<Equipment | null>(null);
+  protected readonly selectedEquipment = signal<Pick<Equipment, 'id' | 'name'> | null>(null);
   protected readonly availability = signal<'unknown' | 'loading' | 'ready' | 'failed'>('unknown');
   private readonly availableIds = signal<Set<number>>(new Set());
   private readonly retryAvailability = new Subject<void>();
@@ -91,8 +113,18 @@ export class ReservationFormPage {
       (control?.touched || parent?.submitted),
     ),
   };
+  protected readonly equipmentMatcher: ErrorStateMatcher = {
+    isErrorState: (_control, parent) => Boolean(
+      this.form.controls.equipment_id.invalid &&
+      (this.form.controls.equipment_id.touched || parent?.submitted),
+    ),
+  };
 
   constructor() {
+    this.form.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      this.conflict.set(null);
+      this.saveFailed.set(false);
+    });
     const periods = this.form.valueChanges.pipe(
       startWith(null),
       map(() => this.period()),
@@ -169,7 +201,7 @@ export class ReservationFormPage {
   }
 
   protected selectEquipment(item: Equipment): void {
-    if (item.status === 'retired') return;
+    if (this.saving() || item.status === 'retired') return;
     this.form.controls.equipment_id.setValue(item.id);
     this.form.controls.equipment_id.markAsTouched();
     this.selectedEquipment.set(item);
@@ -183,5 +215,47 @@ export class ReservationFormPage {
 
   protected focusSearch(): void {
     queueMicrotask(() => this.equipmentSearch()?.nativeElement.focus());
+  }
+
+  protected submit(): void {
+    if (this.saving()) return;
+    this.form.markAllAsTouched();
+    const { site_id, equipment_id, start_date, end_date, note } = this.form.getRawValue();
+    if (this.form.invalid || site_id === null || equipment_id === null) return;
+    const request: ReservationCreate = {
+      site_id, equipment_id, start_date, end_date, note: note || null,
+    };
+    this.conflict.set(null);
+    this.saveFailed.set(false);
+    this.saving.set(true);
+    this.pickerOpen.set(false);
+    this.form.disable({ emitEvent: false });
+    this.api.create(request).pipe(
+      takeUntilDestroyed(this.destroyRef),
+      finalize(() => {
+        this.form.enable({ emitEvent: false });
+        if (this.requestedSite && !this.invalidSiteLink()) {
+          this.form.controls.site_id.disable({ emitEvent: false });
+        }
+        this.saving.set(false);
+      }),
+    ).subscribe({
+      next: () => {
+        this.notifications.success('Request sent');
+        void this.router.navigate(['/reservations']);
+      },
+      error: (error: unknown) => {
+        const conflict = asConflict<ReservationConflictBody>(error);
+        if (conflict) this.conflict.set(conflict);
+        else this.saveFailed.set(true);
+      },
+    });
+  }
+
+  protected chooseAlternative(alternative: AlternativeEquipment): void {
+    if (this.saving()) return;
+    this.form.controls.equipment_id.setValue(alternative.id);
+    this.selectedEquipment.set(alternative);
+    this.submit();
   }
 }

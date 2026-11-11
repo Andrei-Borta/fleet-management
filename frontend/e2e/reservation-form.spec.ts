@@ -18,6 +18,153 @@ test.beforeEach(async ({ page }) => {
   ] }));
 });
 
+test('sends a request and returns to pending reservations', async ({ page }) => {
+  let body: unknown;
+  let role: string | undefined;
+  await page.route('**/api/v1/reservations', async (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: [] });
+    body = route.request().postDataJSON();
+    role = route.request().headers()['x-role'];
+    return route.fulfill({ status: 201, json: { id: 100, ...(body as object), status: 'pending', requested_by_role: role } });
+  });
+  await page.goto('/reservations/new?site_id=42');
+  await page.getByTestId('role-switcher').selectOption('site_manager');
+  await page.getByLabel('Start date').fill('2026-11-12');
+  await page.getByLabel('End date').fill('2026-11-14');
+  await page.getByRole('combobox', { name: 'Equipment', exact: true }).click();
+  await page.getByRole('button', { name: /CAT 320/ }).click();
+  await page.getByLabel('Note (optional)').fill('Deliver early');
+  await page.getByRole('button', { name: 'Submit request' }).click();
+  await expect(page).toHaveURL(/\/reservations$/);
+  await expect(page.getByText('Request sent')).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Pending' })).toHaveAttribute('aria-selected', 'true');
+  expect(role).toBe('site_manager');
+  expect(body).toEqual({ site_id: 42, equipment_id: 1, start_date: '2026-11-12', end_date: '2026-11-14', note: 'Deliver early' });
+});
+
+test('shows a conflict and resubmits the same request with an alternative', async ({ page }) => {
+  const requests: { equipment_id: number; site_id: number; start_date: string; end_date: string; note: string }[] = [];
+  await page.route('**/api/v1/reservations', async (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: [] });
+    const body = route.request().postDataJSON();
+    requests.push(body);
+    if (requests.length === 1) return route.fulfill({ status: 409, json: {
+      detail: 'Equipment is already booked',
+      conflicts: [
+        { kind: 'reservation', id: 99, start_date: '2026-11-10', end_date: '2026-11-20', status: 'approved' },
+        { kind: 'maintenance', id: 4, start_date: '2026-11-13', end_date: '2026-11-14', status: 'planned' },
+      ],
+      alternatives: [{ id: 3, name: 'Crane', type: 'excavator', status: 'available', hourly_cost: 80 }],
+    } });
+    return route.fulfill({ status: 201, json: { ...body, id: 101, status: 'pending', requested_by_role: 'site_manager' } });
+  });
+  await page.goto('/reservations/new?site_id=42');
+  await page.getByLabel('Start date').fill('2026-11-12');
+  await page.getByLabel('End date').fill('2026-11-14');
+  await page.getByLabel('Note (optional)').fill('Morning delivery');
+  await page.getByRole('combobox', { name: 'Equipment', exact: true }).click();
+  await page.getByRole('button', { name: /CAT 320/ }).click();
+  await page.getByRole('button', { name: 'Submit request' }).click();
+  await expect(page.getByRole('alert')).toContainText('This equipment is reserved from 10 Nov 2026 to 20 Nov 2026.');
+  await expect(page.getByRole('combobox', { name: 'Site' })).toHaveCount(0);
+  await expect(page.getByRole('list', { name: 'Conflicts' })).toContainText('This equipment is reserved');
+  await expect(page.getByRole('list', { name: 'Conflicts' })).toContainText('10 Nov 2026');
+  await expect(page.getByRole('list', { name: 'Conflicts' })).toContainText('This equipment is in maintenance from 13 Nov 2026 to 14 Nov 2026.');
+  await expect(page.getByRole('list', { name: 'Alternative equipment' }).getByRole('listitem')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Request Crane' }).click();
+  await expect(page).toHaveURL(/\/reservations$/);
+  expect(requests).toHaveLength(2);
+  expect(requests[1]).toEqual({ ...requests[0], equipment_id: 3 });
+});
+
+test('keeps the form on repeated conflicts and clears stale suggestions when it changes', async ({ page }) => {
+  let requests = 0;
+  await page.route('**/api/v1/reservations', (route) => {
+    requests++;
+    return route.fulfill({ status: 409, json: requests === 1 ? {
+      detail: 'Already booked', conflicts: [],
+      alternatives: [{ id: 3, name: 'Crane', type: 'excavator', status: 'available', hourly_cost: 80 }],
+    } : {
+      detail: 'Alternative now unavailable',
+      conflicts: [{ kind: 'maintenance', id: 4, start_date: '2026-11-10', end_date: null, status: 'in_progress' }],
+      alternatives: [],
+    } });
+  });
+  await page.goto('/reservations/new?site_id=42');
+  await page.getByLabel('Start date').fill('2026-11-12');
+  await page.getByLabel('End date').fill('2026-11-14');
+  await page.getByRole('combobox', { name: 'Equipment', exact: true }).click();
+  await page.getByRole('button', { name: /CAT 320/ }).click();
+  await page.getByRole('button', { name: 'Submit request' }).click();
+  await page.getByRole('button', { name: 'Request Crane' }).click();
+  await expect(page.getByRole('alert')).toContainText('This equipment is in maintenance since 10 Nov 2026, with no known end date.');
+  await expect(page.getByText('No alternatives are available. Choose different equipment or dates.')).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Equipment', exact: true })).toHaveValue('Crane');
+  await expect(page.getByRole('combobox', { name: 'Site' })).toBeDisabled();
+  await page.getByLabel('End date').fill('2026-11-15');
+  await expect(page.getByRole('heading', { name: 'Equipment unavailable' })).toHaveCount(0);
+});
+
+test('prompts for changes on the form when no alternatives exist', async ({ page }) => {
+  await page.route('**/api/v1/reservations', (route) => route.fulfill({ status: 409, json: {
+    detail: 'Equipment is defective and cannot be reserved', conflicts: [], alternatives: [],
+  } }));
+  await page.goto('/reservations/new?site_id=42');
+  await page.getByLabel('Start date').fill('2026-11-12');
+  await page.getByLabel('End date').fill('2026-11-14');
+  await page.getByRole('combobox', { name: 'Equipment', exact: true }).click();
+  await page.getByRole('button', { name: /Broken digger/ }).click();
+  await page.getByRole('button', { name: 'Submit request' }).click();
+  await expect(page.getByRole('alert')).toContainText('Equipment is defective and cannot be reserved');
+  await expect(page.getByRole('alert')).toContainText('Choose different equipment or dates.');
+  await expect(page.getByRole('combobox', { name: 'Equipment', exact: true })).toHaveValue('Broken digger');
+  await expect(page.getByRole('button', { name: 'Edit request' })).toHaveCount(0);
+});
+
+test('shows a spinner while sending a request and returns to the form after an error', async ({ page }) => {
+  let release: () => void = () => undefined;
+  const pending = new Promise<void>((resolve) => { release = resolve; });
+  await page.route('**/api/v1/reservations', async (route) => {
+    await pending;
+    await route.fulfill({ status: 404, json: { detail: 'Equipment not found' } });
+  });
+  try {
+    await page.goto('/reservations/new?site_id=42');
+    await page.getByLabel('Start date').fill('2026-11-12');
+    await page.getByLabel('End date').fill('2026-11-14');
+    await page.getByRole('combobox', { name: 'Equipment', exact: true }).click();
+    await page.getByRole('button', { name: /CAT 320/ }).click();
+    await page.getByRole('button', { name: 'Submit request' }).click();
+    await expect(page.getByRole('progressbar', { name: 'Sending request' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Site' })).toHaveCount(0);
+    release();
+    await expect(page.getByText('Equipment not found')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Submit request' })).toBeEnabled();
+  } finally {
+    release();
+  }
+});
+
+test('validates required fields and lets the interceptor report failed submissions', async ({ page }) => {
+  let requests = 0;
+  await page.route('**/api/v1/reservations', (route) => {
+    requests++;
+    return route.fulfill({ status: 404, json: { detail: 'Equipment not found' } });
+  });
+  await page.goto('/reservations/new?site_id=42');
+  await page.getByRole('button', { name: 'Submit request' }).click();
+  await expect(page.getByText('Choose equipment.')).toBeVisible();
+  expect(requests).toBe(0);
+  await page.getByLabel('Start date').fill('2026-11-12');
+  await page.getByLabel('End date').fill('2026-11-14');
+  await page.getByRole('combobox', { name: 'Equipment', exact: true }).click();
+  await page.getByRole('button', { name: /CAT 320/ }).click();
+  await page.getByRole('button', { name: 'Submit request' }).click();
+  await expect(page.getByText('Equipment not found')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Submit request' })).toBeEnabled();
+  await expect(page.getByRole('heading', { name: 'Equipment unavailable' })).toHaveCount(0);
+});
+
 test('opens the reservation route from each entry point', async ({ page }) => {
   test.setTimeout(60_000);
   await page.route('**/api/v1/sites/42', (route) =>
