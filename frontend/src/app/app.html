@@ -38,6 +38,77 @@
       <span class="material-symbols-rounded">menu</span>
     </button>
     <span class="spacer"></span>
+    <div class="notification-menu">
+      <button
+        mat-icon-button
+        data-testid="notification-toggle"
+        [attr.aria-label]="
+          notificationFeed.unreadCount()
+            ? 'Notifications, ' + notificationFeed.unreadCount() + ' unread'
+            : 'Notifications'
+        "
+        aria-haspopup="true"
+        aria-controls="notification-panel"
+        [attr.aria-expanded]="notificationOpen()"
+        (click)="toggleNotifications()"
+      >
+        <span class="material-symbols-rounded" aria-hidden="true">notifications</span>
+        @if (notificationFeed.unreadCount() > 0) {
+          <span class="unread-count text-caption" data-testid="notification-count">
+            {{ notificationFeed.unreadCount() > 99 ? '99+' : notificationFeed.unreadCount() }}
+          </span>
+        }
+      </button>
+      @if (notificationOpen()) {
+        <section
+          class="notification-panel"
+          id="notification-panel"
+          aria-label="Notifications"
+          data-testid="notification-panel"
+        >
+          <h2>Notifications</h2>
+          @if (notificationFeed.loading() && notificationFeed.items().length === 0) {
+            <p class="panel-state" role="status">Loading notifications…</p>
+          } @else if (notificationFeed.failed() && notificationFeed.items().length === 0) {
+            <div class="panel-state" role="alert">
+              <p>Notifications could not be loaded.</p>
+              <button mat-button data-testid="notification-retry" (click)="notificationFeed.refresh()">
+                Retry
+              </button>
+            </div>
+          } @else if (notificationFeed.items().length === 0) {
+            <p class="panel-state">You’re all caught up.</p>
+          } @else {
+            @if (notificationFeed.failed()) {
+              <div class="panel-error" role="alert">
+                <span>Notifications could not be refreshed.</span>
+                <button mat-button data-testid="notification-retry" (click)="notificationFeed.refresh()">
+                  Retry
+                </button>
+              </div>
+            }
+            <ul>
+              @for (item of notificationFeed.items(); track item.id) {
+                <li>
+                  <a
+                    [routerLink]="item.link"
+                    [class.unread]="!item.is_read"
+                    [attr.data-testid]="'notification-' + item.id"
+                    (click)="openNotification(item.id)"
+                  >
+                    <span class="notification-title">{{ item.title }}</span>
+                    <span class="notification-message">{{ item.message }}</span>
+                    <time class="text-caption" [attr.datetime]="item.created_at">
+                      {{ item.created_at | date: 'dd MMM yyyy' }}
+                    </time>
+                  </a>
+                </li>
+              }
+            </ul>
+          }
+        </section>
+      }
+    </div>
     <label class="role">
       <span class="text-caption">Role</span>
       <select
