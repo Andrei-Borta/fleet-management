@@ -3,8 +3,11 @@ import { APIRequestContext, expect, Page } from '@playwright/test';
 
 import type { Role } from '../../src/app/core/role.service';
 
-/** Backend base URL used by specs that set up or verify data through the real API. */
-export const API = 'http://localhost:8000/api/v1';
+/**
+ * Backend base URL used by specs that set up or verify data through the real API.
+ * Override with E2E_API_URL, e.g. http://localhost:8080/api/v1 for the production compose stack.
+ */
+export const API = process.env['E2E_API_URL'] ?? 'http://localhost:8000/api/v1';
 
 /** A short unique suffix so parallel specs never share records in the seeded database. */
 export function uniqueId(prefix = 'E2E'): string {
