@@ -42,6 +42,7 @@ const LOAD_ANIMATION_MS = 600;
   template: `
     <app-page-header title="Dashboard" subtitle="Fleet overview">
       <a mat-stroked-button routerLink="/dashboard/costs">Site costs</a>
+      <a mat-flat-button routerLink="/reservations/new">New reservation</a>
     </app-page-header>
     <section aria-label="Fleet overview" [attr.aria-busy]="loading()">
       @if (loading() && !fleet()) {
