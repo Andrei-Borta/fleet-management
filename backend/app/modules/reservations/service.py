@@ -3,7 +3,7 @@
 Every public function here MUST have pytest tests (see AGENTS.md).
 """
 
-from datetime import date
+from datetime import UTC, date, datetime, time
 
 from sqlalchemy import exists, or_, select
 from sqlalchemy.orm import Session
@@ -289,10 +289,19 @@ def list_calendar_events(
     ]
 
     if site_id is None:
+        period_start = datetime.combine(start, time.min, tzinfo=UTC)
         maintenance_query = (
             select(ServiceIntervention, Equipment)
             .join(Equipment, ServiceIntervention.equipment_id == Equipment.id)
-            .where(ServiceIntervention.scheduled_date <= end)
+            .where(
+                ServiceIntervention.scheduled_date <= end,
+                # Skip jobs finished before the period instead of loading the whole history.
+                or_(
+                    ServiceIntervention.completed_at.is_(None),
+                    ServiceIntervention.completed_at >= period_start,
+                    ServiceIntervention.scheduled_date >= start,
+                ),
+            )
         )
         if equipment_id is not None:
             maintenance_query = maintenance_query.where(

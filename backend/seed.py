@@ -27,7 +27,7 @@ from app.modules.maintenance.models import (
     InterventionStatus,
     ServiceIntervention,
 )
-from app.modules.operations.models import UsageLog
+from app.modules.operations.models import Checklist, ChecklistItem, UsageLog
 from app.modules.reservations.models import Reservation, ReservationStatus
 from app.modules.sites.models import Site
 
@@ -511,6 +511,8 @@ PARTS = [
 def _clear(session: Session) -> None:
     """Delete every fleet row in foreign-key-safe order."""
     for model in (
+        ChecklistItem,
+        Checklist,
         UsageLog,
         InterventionPart,
         ServiceIntervention,

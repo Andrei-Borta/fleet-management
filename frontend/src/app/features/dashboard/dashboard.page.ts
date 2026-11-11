@@ -19,6 +19,7 @@ import {
 import { BaseChartDirective, provideCharts } from 'ng2-charts';
 import { finalize } from 'rxjs';
 
+import { RoleService } from '../../core/role.service';
 import { ThemeService } from '../../core/theme.service';
 import { PageHeader } from '../../shared/page-header/page-header';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
@@ -42,7 +43,9 @@ const LOAD_ANIMATION_MS = 600;
   template: `
     <app-page-header title="Dashboard" subtitle="Fleet overview">
       <a mat-stroked-button routerLink="/dashboard/costs">Site costs</a>
-      <a mat-flat-button routerLink="/reservations/new">New reservation</a>
+      @if (roles.can('reservations.request')) {
+        <a mat-flat-button routerLink="/reservations/new">New reservation</a>
+      }
     </app-page-header>
     <section aria-label="Fleet overview" [attr.aria-busy]="loading()">
       @if (loading() && !fleet()) {
@@ -154,6 +157,7 @@ const LOAD_ANIMATION_MS = 600;
 })
 export class DashboardPage {
   private readonly api = inject(DashboardService);
+  protected readonly roles = inject(RoleService);
   private readonly document = inject(DOCUMENT);
   private readonly theme = inject(ThemeService);
   private readonly destroyRef = inject(DestroyRef);
