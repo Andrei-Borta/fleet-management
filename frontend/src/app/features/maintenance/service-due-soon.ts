@@ -1,4 +1,3 @@
-import { DecimalPipe } from '@angular/common';
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
@@ -9,6 +8,7 @@ import { finalize } from 'rxjs';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
 import { MaintenanceService } from './maintenance.service';
 import { DueEquipment } from './maintenance.models';
+import { serviceDueRemaining } from './service-due';
 
 /** "Service due soon" section of the maintenance page, from `GET /maintenance/due`. */
 @Component({
@@ -76,7 +76,6 @@ import { DueEquipment } from './maintenance.models';
 export class ServiceDueSoon {
   private readonly api = inject(MaintenanceService);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly decimal = new DecimalPipe('ro');
 
   protected readonly items = signal<DueEquipment[]>([]);
   protected readonly loading = signal(false);
@@ -101,18 +100,5 @@ export class ServiceDueSoon {
       });
   }
 
-  /** "3 days left", "12 h left", "2 days overdue"; days and hours both shown when tracked. */
-  protected remaining(item: DueEquipment): string {
-    const parts: string[] = [];
-    if (item.days_until_due !== null) {
-      const days = Math.abs(item.days_until_due);
-      const unit = days === 1 ? 'day' : 'days';
-      parts.push(`${days} ${unit} ${item.days_until_due < 0 ? 'overdue' : 'left'}`);
-    }
-    if (item.hours_until_due !== null) {
-      const hours = this.decimal.transform(Math.abs(item.hours_until_due), '1.0-1');
-      parts.push(`${hours} h ${item.hours_until_due < 0 ? 'overdue' : 'left'}`);
-    }
-    return parts.join(' · ');
-  }
+  protected readonly remaining = serviceDueRemaining;
 }

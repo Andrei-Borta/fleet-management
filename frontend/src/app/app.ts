@@ -21,7 +21,10 @@ import { NotificationsFeedService } from './features/notifications/notifications
   imports: [DatePipe, RouterOutlet, RouterLink, RouterLinkActive, FormsModule, MatButtonModule],
   templateUrl: './app.html',
   styleUrl: './app.scss',
-  host: { '(document:keydown.escape)': 'handleEscape()' },
+  host: {
+    '(document:keydown.escape)': 'handleEscape()',
+    '(document:click)': 'closeNotificationsOutside($event)',
+  },
 })
 export class App {
   private readonly injector = inject(Injector);
@@ -35,6 +38,7 @@ export class App {
 
   private readonly sidenav = viewChild.required<ElementRef<HTMLElement>>('sidenav');
   private readonly menuButton = viewChild.required('menuButton', { read: ElementRef });
+  private readonly notificationMenu = viewChild<ElementRef<HTMLElement>>('notificationMenu');
 
   /**
    * Switches the demo role. Leaves the current page when the new role doesn't see it,
@@ -62,6 +66,13 @@ export class App {
     this.notificationOpen.set(false);
   }
 
+  /** Clicking anywhere outside the bell and its panel closes the panel. */
+  protected closeNotificationsOutside(event: MouseEvent): void {
+    const menu = this.notificationMenu()?.nativeElement;
+    if (this.notificationOpen() && menu && !menu.contains(event.target as Node)) {
+      this.closeNotifications();
+    }
+  }
   protected handleEscape(): void {
     this.closeNav(true);
     this.closeNotifications();

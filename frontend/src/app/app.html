@@ -38,7 +38,7 @@
       <span class="material-symbols-rounded">menu</span>
     </button>
     <span class="spacer"></span>
-    <div class="notification-menu">
+    <div class="notification-menu" #notificationMenu>
       <button
         mat-icon-button
         data-testid="notification-toggle"
@@ -66,7 +66,14 @@
           aria-label="Notifications"
           data-testid="notification-panel"
         >
-          <h2>Notifications</h2>
+          <div class="panel-header">
+            <h2>Notifications</h2>
+            @if (notificationFeed.unreadCount() > 0) {
+              <button mat-button data-testid="notification-read-all" (click)="notificationFeed.markAllRead()">
+                Mark all as read
+              </button>
+            }
+          </div>
           @if (notificationFeed.loading() && notificationFeed.items().length === 0) {
             <p class="panel-state" role="status">Loading notifications…</p>
           } @else if (notificationFeed.failed() && notificationFeed.items().length === 0) {
@@ -92,12 +99,12 @@
                 <li>
                   <a
                     [routerLink]="item.link"
-                    [class.unread]="!item.is_read"
+                    [class.unread]="!item.read_at"
                     [attr.data-testid]="'notification-' + item.id"
                     (click)="openNotification(item.id)"
                   >
                     <span class="notification-title">{{ item.title }}</span>
-                    <span class="notification-message">{{ item.message }}</span>
+                    <span class="notification-message">{{ item.body }}</span>
                     <time class="text-caption" [attr.datetime]="item.created_at">
                       {{ item.created_at | date: 'dd MMM yyyy' }}
                     </time>
