@@ -3,6 +3,7 @@ import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { RouterLink } from '@angular/router';
 import {
   ArcElement,
   BarController,
@@ -33,13 +34,15 @@ const LOAD_ANIMATION_MS = 600;
   selector: 'app-dashboard-page',
   imports: [
     PageHeader, StatusBadge, MatButtonModule, MatButtonToggleModule,
-    MatProgressBarModule, BaseChartDirective, PendingRequestsWidget, ServiceDueWidget,
+    MatProgressBarModule, BaseChartDirective, PendingRequestsWidget, ServiceDueWidget, RouterLink,
   ],
   providers: [provideCharts({
     registerables: [ArcElement, BarController, BarElement, CategoryScale, DoughnutController, LinearScale, Tooltip],
   })],
   template: `
-    <app-page-header title="Dashboard" subtitle="Fleet overview" />
+    <app-page-header title="Dashboard" subtitle="Fleet overview">
+      <a mat-flat-button routerLink="/reservations/new">New reservation</a>
+    </app-page-header>
     <section aria-label="Fleet overview" [attr.aria-busy]="loading()">
       @if (loading() && !fleet()) {
         <div class="card"><mat-progress-bar data-testid="fleet-loading" mode="indeterminate" /></div>
