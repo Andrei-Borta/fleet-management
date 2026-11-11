@@ -57,6 +57,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/calendar/calendar.page').then((m) => m.CalendarPage),
   },
   {
+    path: 'maintenance/report',
+    title: 'Report defect',
+    loadComponent: () =>
+      import('./features/maintenance/defect-report.page').then((m) => m.DefectReportPage),
+  },
+  {
     path: 'maintenance',
     title: 'Maintenance',
     loadComponent: () =>

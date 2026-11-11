@@ -11,15 +11,52 @@
   } @else if (!loading()) {
     <form [formGroup]="form" (ngSubmit)="submit()">
       <div class="form-grid">
-        <mat-form-field appearance="outline">
-          <mat-label>Equipment</mat-label>
-          <mat-select formControlName="equipment_id" required data-testid="defect-equipment">
-            @for (item of equipment(); track item.id) {
-              <mat-option [value]="item.id">{{ item.name }} ({{ item.serial_no }})</mat-option>
-            }
-          </mat-select>
-          <mat-error>Select equipment.</mat-error>
-        </mat-form-field>
+        <div class="equipment-field" cdkOverlayOrigin #overlayOrigin="cdkOverlayOrigin">
+          <mat-form-field appearance="outline">
+            <mat-label>Equipment</mat-label>
+            <input #equipmentTrigger matInput readonly required class="equipment-trigger"
+              role="combobox" aria-label="Equipment" aria-haspopup="dialog"
+              aria-controls="defect-equipment-picker" [attr.aria-expanded]="pickerOpen()"
+              [formControl]="equipmentDisplay" data-testid="defect-equipment"
+              (click)="openPicker()" (keydown.enter)="openPicker(); $event.preventDefault()"
+              (keydown.space)="openPicker(); $event.preventDefault()" />
+            <span matSuffix class="material-symbols-rounded" aria-hidden="true">arrow_drop_down</span>
+            <mat-error>Select equipment.</mat-error>
+          </mat-form-field>
+        </div>
+        <ng-template cdkConnectedOverlay [cdkConnectedOverlayOrigin]="overlayOrigin"
+          [cdkConnectedOverlayOpen]="pickerOpen()" [cdkConnectedOverlayHasBackdrop]="true"
+          cdkConnectedOverlayBackdropClass="cdk-overlay-transparent-backdrop"
+          [cdkConnectedOverlayWidth]="'min(35rem, calc(100vw - 2rem))'" (attach)="focusSearch()"
+          (backdropClick)="closePicker()" (overlayKeydown)="$event.key === 'Escape' && closePicker()">
+          <section class="equipment-popover" id="defect-equipment-picker" role="dialog" aria-label="Choose equipment">
+            <div class="equipment-filters">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-label>Search equipment</mat-label>
+                <input #equipmentSearch matInput [value]="search()" (input)="search.set(equipmentSearch.value)" />
+              </mat-form-field>
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-label>Category</mat-label>
+                <mat-select [value]="category()" (selectionChange)="category.set($event.value)">
+                  <mat-option value="">All</mat-option>
+                  @for (type of categories(); track type) {
+                    <mat-option [value]="type">{{ type }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="equipment-list" aria-label="Equipment choices">
+              @for (item of filteredEquipment(); track item.id) {
+                <button type="button" class="equipment-option" (click)="selectEquipment(item)">
+                  <span>{{ item.name }} <span class="text-muted">({{ item.type }})</span></span>
+                  <app-status-badge [status]="item.status" />
+                </button>
+              } @empty {
+                <p class="text-muted" role="status">No equipment matches these filters.</p>
+              }
+            </div>
+          </section>
+        </ng-template>
         <mat-form-field appearance="outline">
           <mat-label>Severity</mat-label>
           <mat-select formControlName="severity" required data-testid="defect-severity">
@@ -29,7 +66,7 @@
           </mat-select>
           <mat-error>Select a severity.</mat-error>
         </mat-form-field>
-        <mat-form-field appearance="outline">
+        <mat-form-field appearance="outline" class="description-field">
           <mat-label>Description</mat-label>
           <textarea matInput formControlName="description" required maxlength="2000" data-testid="defect-description"></textarea>
           <mat-error>Enter a description of up to 2,000 characters.</mat-error>
