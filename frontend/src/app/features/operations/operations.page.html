@@ -1,0 +1,222 @@
+<app-page-header
+  title="Operations"
+  subtitle="Record daily equipment hours and fuel use"
+/>
+
+<section
+  class="card"
+  [attr.aria-busy]="loading() || saving()"
+  [attr.data-save-failed]="saveFailed()"
+>
+  <h2>Log usage</h2>
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Loading usage data" />
+  } @else if (failed()) {
+    <div class="empty-state">
+      <p>Usage data could not be loaded.</p>
+      <button mat-stroked-button type="button" (click)="load()">Retry</button>
+    </div>
+  } @else if (!equipment().length || !sites().length) {
+    <div class="empty-state">
+      <span class="material-symbols-rounded" aria-hidden="true">construction</span>
+      @if (!equipment().length && !sites().length) {
+        <p>Add equipment and a site before logging usage.</p>
+      } @else if (!equipment().length) {
+        <p>Add equipment before logging usage.</p>
+      } @else {
+        <p>Add a site before logging usage.</p>
+      }
+    </div>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="submit()" data-testid="usage-form">
+      <div class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Equipment</mat-label>
+          <mat-select formControlName="equipment_id" required>
+            @for (item of equipment(); track item.id) {
+              <mat-option [value]="item.id">{{ item.name }}</mat-option>
+            }
+          </mat-select>
+          @if (form.controls.equipment_id.touched && form.controls.equipment_id.hasError('required')) {
+            <mat-error>Choose equipment.</mat-error>
+          }
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Site</mat-label>
+          <mat-select formControlName="site_id" required>
+            @for (site of sites(); track site.id) {
+              <mat-option [value]="site.id">{{ site.name }}</mat-option>
+            }
+          </mat-select>
+          @if (form.controls.site_id.touched && form.controls.site_id.hasError('required')) {
+            <mat-error>Choose a site.</mat-error>
+          }
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Date</mat-label>
+          <input matInput type="date" formControlName="date" required />
+          @if (form.controls.date.touched && form.controls.date.invalid) {
+            <mat-error>Enter a valid date.</mat-error>
+          }
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Hours worked</mat-label>
+          <input matInput type="number" min="0" step="0.01" formControlName="hours" required />
+          @if (form.controls.hours.touched && form.controls.hours.invalid) {
+            <mat-error>Enter non-negative hours with up to two decimal places.</mat-error>
+          }
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Fuel (liters)</mat-label>
+          <input
+            matInput
+            type="number"
+            min="0"
+            step="0.01"
+            formControlName="fuel_liters"
+            required
+          />
+          @if (form.controls.fuel_liters.touched && form.controls.fuel_liters.invalid) {
+            <mat-error>Enter non-negative liters with up to two decimal places.</mat-error>
+          }
+        </mat-form-field>
+      </div>
+      <div class="form-actions">
+        <button
+          mat-flat-button
+          type="submit"
+          [disabled]="saving()"
+          data-testid="save-usage"
+        >
+          {{ saving() ? 'Saving…' : 'Save usage' }}
+        </button>
+      </div>
+    </form>
+  }
+</section>
+
+@if (!loading() && !failed()) {
+  <section class="filters-bar" aria-label="Usage history filters">
+    <mat-form-field appearance="outline">
+      <mat-label>Filter equipment</mat-label>
+      <mat-select
+        [value]="selectedEquipment()"
+        (selectionChange)="filterEquipment($event.value)"
+      >
+        <mat-option [value]="null">All equipment</mat-option>
+        @for (item of equipment(); track item.id) {
+          <mat-option [value]="item.id">{{ item.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Filter site</mat-label>
+      <mat-select [value]="selectedSite()" (selectionChange)="filterSite($event.value)">
+        <mat-option [value]="null">All sites</mat-option>
+        @for (site of sites(); track site.id) {
+          <mat-option [value]="site.id">{{ site.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </section>
+
+  <section class="card" aria-labelledby="usage-totals-heading">
+    <h2 id="usage-totals-heading">Totals by equipment and site</h2>
+    @if (totals().length) {
+      <div class="table-scroll">
+        <table
+          mat-table
+          [dataSource]="visibleTotals()"
+          aria-label="Usage totals by equipment and site"
+        >
+          <ng-container matColumnDef="equipment">
+            <th mat-header-cell *matHeaderCellDef>Equipment</th>
+            <td mat-cell *matCellDef="let row">{{ equipmentName(row.equipment_id) }}</td>
+          </ng-container>
+          <ng-container matColumnDef="site">
+            <th mat-header-cell *matHeaderCellDef>Site</th>
+            <td mat-cell *matCellDef="let row">{{ siteName(row.site_id) }}</td>
+          </ng-container>
+          <ng-container matColumnDef="entries">
+            <th mat-header-cell *matHeaderCellDef>Entries</th>
+            <td mat-cell *matCellDef="let row" class="num">{{ row.entries }}</td>
+          </ng-container>
+          <ng-container matColumnDef="hours">
+            <th mat-header-cell *matHeaderCellDef>Total hours</th>
+            <td mat-cell *matCellDef="let row" class="num">{{ row.total_hours | number: '1.2-2' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="fuel">
+            <th mat-header-cell *matHeaderCellDef>Total fuel (L)</th>
+            <td mat-cell *matCellDef="let row" class="num">
+              {{ row.total_fuel_liters | number: '1.2-2' }}
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="totalsColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: totalsColumns"></tr>
+        </table>
+      </div>
+      @if (totals().length > 20) {
+        <mat-paginator
+          [length]="totals().length"
+          [pageIndex]="totalsPage()"
+          [pageSize]="totalsPageSize()"
+          [pageSizeOptions]="[20, 50]"
+          (page)="totalsPage.set($event.pageIndex); totalsPageSize.set($event.pageSize)"
+        />
+      }
+    } @else {
+      <div class="empty-state">
+        <span class="material-symbols-rounded" aria-hidden="true">query_stats</span>
+        <p>No usage totals match these filters.</p>
+      </div>
+    }
+  </section>
+
+  <section class="card" aria-labelledby="usage-history-heading">
+    <h2 id="usage-history-heading">Usage history</h2>
+    @if (filteredItems().length) {
+      <div class="table-scroll">
+        <table mat-table [dataSource]="visibleItems()" aria-label="Usage history">
+          <ng-container matColumnDef="equipment">
+            <th mat-header-cell *matHeaderCellDef>Equipment</th>
+            <td mat-cell *matCellDef="let row">{{ equipmentName(row.equipment_id) }}</td>
+          </ng-container>
+          <ng-container matColumnDef="site">
+            <th mat-header-cell *matHeaderCellDef>Site</th>
+            <td mat-cell *matCellDef="let row">{{ siteName(row.site_id) }}</td>
+          </ng-container>
+          <ng-container matColumnDef="date">
+            <th mat-header-cell *matHeaderCellDef>Date</th>
+            <td mat-cell *matCellDef="let row">{{ row.date | date: 'dd MMM yyyy' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="hours">
+            <th mat-header-cell *matHeaderCellDef>Hours</th>
+            <td mat-cell *matCellDef="let row" class="num">{{ row.hours | number: '1.2-2' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="fuel">
+            <th mat-header-cell *matHeaderCellDef>Fuel (L)</th>
+            <td mat-cell *matCellDef="let row" class="num">
+              {{ row.fuel_liters | number: '1.2-2' }}
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="historyColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: historyColumns"></tr>
+        </table>
+      </div>
+      @if (filteredItems().length > 20) {
+        <mat-paginator
+          [length]="filteredItems().length"
+          [pageIndex]="historyPage()"
+          [pageSize]="historyPageSize()"
+          [pageSizeOptions]="[20, 50]"
+          (page)="historyPage.set($event.pageIndex); historyPageSize.set($event.pageSize)"
+        />
+      }
+    } @else {
+      <div class="empty-state">
+        <span class="material-symbols-rounded" aria-hidden="true">history</span>
+        <p>No usage logs match these filters.</p>
+      </div>
+    }
+  </section>
+}
