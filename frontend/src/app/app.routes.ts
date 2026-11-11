@@ -1,5 +1,10 @@
-import { isDevMode } from '@angular/core';
+import { inject, isDevMode } from '@angular/core';
 import { Routes } from '@angular/router';
+
+import { RoleService } from './core/role.service';
+
+/** Each role lands on its own page (core/role.service.ts). */
+const roleHome = () => inject(RoleService).home();
 
 /** Dev-only pages. Not registered in production builds. */
 const devRoutes: Routes = [
@@ -11,7 +16,7 @@ const devRoutes: Routes = [
 ];
 
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+  { path: '', pathMatch: 'full', redirectTo: roleHome },
   {
     path: 'dashboard/costs',
     title: 'Site costs',
@@ -101,5 +106,5 @@ export const routes: Routes = [
     title: 'Site details',
     loadComponent: () => import('./features/sites/site-detail.page').then((m) => m.SiteDetailPage),
   },
-  { path: '**', redirectTo: 'dashboard' },
+  { path: '**', redirectTo: roleHome },
 ];

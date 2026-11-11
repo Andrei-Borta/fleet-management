@@ -109,7 +109,7 @@ export class ReservationsPage {
       this.busy() !== null ||
       (action === 'cancel'
         ? !this.canCancel(r)
-        : this.roles.role() !== 'fleet_manager' || r.status !== 'pending')
+        : !this.roles.can('reservations.decide') || r.status !== 'pending')
     )
       return;
     if (action === 'approve') {
@@ -131,7 +131,7 @@ export class ReservationsPage {
     // Check permissions again in case the role changed while a dialog was open.
     if (
       this.busy() !== null ||
-      (action === 'cancel' ? !this.canCancel(r) : this.roles.role() !== 'fleet_manager')
+      (action === 'cancel' ? !this.canCancel(r) : !this.roles.can('reservations.decide'))
     )
       return;
     this.busy.set(r.id);

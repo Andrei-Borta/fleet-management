@@ -6,6 +6,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { finalize, forkJoin } from 'rxjs';
 
+import { RoleService } from '../../core/role.service';
 import { PageHeader } from '../../shared/page-header/page-header';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
 import { Reservation } from '../reservations/reservations.models';
@@ -50,6 +51,7 @@ import { SitesService } from './sites.service';
 })
 export class SiteDetailPage {
   private readonly service = inject(SitesService);
+  protected readonly roles = inject(RoleService);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly id = inject(ActivatedRoute).snapshot.paramMap.get('id')!;
   protected readonly hasEquipmentDetails = inject(Router).config.some(
