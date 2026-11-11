@@ -79,16 +79,21 @@ test('site manager stays on the dashboard and only sees request actions', async 
   await expect(page.getByRole('link', { name: 'Add equipment' })).toHaveCount(0);
 });
 
-test('switching role keeps a page the new role can see and hides its actions', async ({ page }) => {
+test('switching role opens the new role home, even from a page it can see', async ({ page }) => {
   await page.goto('/equipment');
   await expect(page.getByRole('link', { name: 'Add equipment' })).toBeVisible();
 
-  await page.getByTestId('role-switcher').selectOption('mechanic');
-  await expect(page).toHaveURL(/\/equipment$/);
+  await page.getByTestId('role-switcher').selectOption('site_manager');
+  await expect(page).toHaveURL(/\/dashboard$/);
+
+  await page.getByRole('link', { name: 'Equipment', exact: true }).click();
   await expect(page.getByRole('link', { name: 'Add equipment' })).toHaveCount(0);
 
+  await page.getByTestId('role-switcher').selectOption('mechanic');
+  await expect(page).toHaveURL(/\/maintenance$/);
+
   await page.getByTestId('role-switcher').selectOption('fleet_manager');
-  await expect(page.getByRole('link', { name: 'Add equipment' })).toBeVisible();
+  await expect(page).toHaveURL(/\/dashboard$/);
 });
 
 test('switching role leaves a page the new role cannot see', async ({ page }) => {

@@ -109,10 +109,6 @@ export class RoleService {
     return PROFILES[this.role()].permissions.includes(permission);
   }
 
-  /** Landing page of any role, e.g. to tell whether the user is still on the previous role's home. */
-  homeOf(role: Role): string {
-    return PROFILES[role].home;
-  }
 
   /**
    * Whether `url` belongs to a section shown in this role's nav (`/sites/3` → `/sites`)

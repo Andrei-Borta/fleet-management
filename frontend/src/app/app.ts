@@ -40,17 +40,10 @@ export class App {
   private readonly menuButton = viewChild.required('menuButton', { read: ElementRef });
   private readonly notificationMenu = viewChild<ElementRef<HTMLElement>>('notificationMenu');
 
-  /**
-   * Switches the demo role. Leaves the current page when the new role doesn't see it,
-   * or when the user is still on the previous role's landing page.
-   */
+  /** Switches the demo role and opens that role's landing page, like signing in as someone else. */
   protected switchRole(role: Role): void {
-    const previousHome = this.roleService.homeOf(this.roleService.role());
     this.roleService.role.set(role);
-    const url = this.router.url.split(/[?#]/)[0];
-    if (url === previousHome || !this.roleService.canVisit(url)) {
-      void this.router.navigateByUrl(this.roleService.home());
-    }
+    void this.router.navigateByUrl(this.roleService.home());
   }
 
   protected toggleNotifications(): void {
