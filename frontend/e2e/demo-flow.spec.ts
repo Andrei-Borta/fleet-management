@@ -88,7 +88,7 @@ test('demo storyline: request, conflict, approval, defect, repair and costs', as
     await page.getByRole('combobox', { name: 'Equipment', exact: true }).click();
     const picker = page.getByRole('dialog', { name: 'Choose equipment' });
     await picker.getByRole('textbox', { name: 'Search equipment' }).fill(id);
-    await picker.getByRole('button', { name: `${excavatorName} (${type}) Reserved` }).click();
+    await picker.getByRole('button', { name: `${excavatorName} (${type}) Unavailable for these dates` }).click();
     await page.getByRole('button', { name: 'Submit request' }).click();
     await expect(page.getByRole('alert')).toContainText(
       'This equipment is reserved from 01 Feb 2027 to 10 Feb 2027.',
