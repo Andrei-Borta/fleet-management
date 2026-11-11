@@ -12,6 +12,8 @@ never get sent to a site.
 | ![Dashboard with fleet status and utilization](docs/images/dashboard.png) | ![A conflicting request suggests free excavators](docs/images/reservation-conflict.png) |
 | **Site costs vs. budget** | **Reporting a defect** |
 | ![Site costs with an over-budget site](docs/images/site-costs.png) | ![Operator reporting a critical defect](docs/images/report-defect.png) |
+| **Maintenance board** | |
+| ![Mechanic's maintenance board with planned, in-progress and done repairs](docs/images/maintenance-board.png) | |
 
 How to use the app as each role: [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
