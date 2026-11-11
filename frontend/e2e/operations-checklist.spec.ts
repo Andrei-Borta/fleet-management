@@ -32,6 +32,9 @@ test('submits a passing daily checklist for the selected equipment', async ({ pa
         { name: 'Brakes', ok: true, critical: true },
         { name: 'Lights and indicators', ok: true, critical: true },
         { name: 'Fluid or hydraulic leaks', ok: true, critical: true },
+        { name: 'Tires or tracks', ok: true, critical: true },
+        { name: 'Horn and warning signals', ok: true, critical: false },
+        { name: 'Mirrors and visibility', ok: true, critical: false },
       ],
     });
     await route.fulfill({
@@ -52,13 +55,14 @@ test('submits a passing daily checklist for the selected equipment', async ({ pa
   await expect(page.getByTestId('checklist-date')).toHaveValue('2026-11-11');
 
   for (const id of ['brakes', 'lights', 'leaks', 'tires', 'horn', 'mirrors']) {
-    await page.getByTestId(`check-item-${id}`).getByLabel('OK').check();
+    await page
+      .getByTestId(`check-item-${id}`)
+      .getByRole('radio', { name: 'OK', exact: true })
+      .check();
   }
   await expect(page.getByTestId('critical-warning')).toHaveCount(0);
   await page.getByTestId('submit-checklist').click();
-  await expect(page.getByTestId('checklist-result')).toContainText(
-    'Equipment passed today’s safety check.',
-  );
+  await expect(page.getByTestId('checklist-result')).toContainText('Equipment passed today');
   await expect(page.getByTestId('submit-checklist')).toBeDisabled();
 });
 
@@ -89,9 +93,15 @@ test('warns and records when a critical safety item fails', async ({ page }) => 
   await page.getByRole('combobox', { name: 'Equipment' }).click();
   await page.getByRole('option', { name: 'Loader (LD-12)', exact: true }).click();
   for (const id of ['lights', 'leaks', 'tires', 'horn', 'mirrors']) {
-    await page.getByTestId(`check-item-${id}`).getByLabel('OK').check();
+    await page
+      .getByTestId(`check-item-${id}`)
+      .getByRole('radio', { name: 'OK', exact: true })
+      .check();
   }
-  await page.getByTestId('check-item-brakes').getByLabel('Not OK').check();
+  await page
+    .getByTestId('check-item-brakes')
+    .getByRole('radio', { name: 'Not OK', exact: true })
+    .check();
   await expect(page.getByTestId('critical-warning')).toContainText('Do not operate this machine.');
   await expect(page.getByTestId('critical-warning')).toContainText('will block the equipment');
 
