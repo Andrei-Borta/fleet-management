@@ -46,6 +46,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/sites/sites.page').then((m) => m.SitesPage),
   },
   {
+    path: 'reservations/new',
+    title: 'New reservation',
+    loadComponent: () =>
+      import('./features/reservations/reservation-form.page').then((m) => m.ReservationFormPage),
+  },
+  {
     path: 'reservations',
     title: 'Reservations',
     loadComponent: () =>
