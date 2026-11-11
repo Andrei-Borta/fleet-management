@@ -141,8 +141,8 @@ nav {
   top: calc(100% + var(--space-2));
   right: 0;
   z-index: 20;
-  width: min(24rem, calc(100vw - var(--space-4) - var(--space-4)));
-  max-height: min(70vh, 32rem);
+  width: min(24rem, calc(100vw - var(--space-6)));
+  max-height: 70vh;
   overflow: auto;
   padding: var(--space-4);
   border: 1px solid var(--color-border);
