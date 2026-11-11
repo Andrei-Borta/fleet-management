@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import InvalidDataError, NotFoundError
 from app.modules.equipment.models import Equipment
 from app.modules.maintenance.models import Defect, DefectSeverity, DefectStatus
-from app.modules.maintenance.service import recompute_status
+from app.modules.maintenance.service import announce_defect, recompute_status
 from app.modules.operations.models import Checklist, ChecklistItem, UsageLog
 from app.modules.operations.schemas import (
     ChecklistCreate,
@@ -112,7 +112,8 @@ def create_checklist(db: Session, data: ChecklistCreate) -> Checklist:
                 status=DefectStatus.OPEN,
             )
             db.add(defect)
-        db.flush()
+            db.flush()
+            announce_defect(db, defect)
         recompute_status(db, equipment.id)
 
     db.commit()

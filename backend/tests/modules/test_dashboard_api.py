@@ -13,6 +13,7 @@ from app.core.db import get_db
 from app.main import app
 from app.modules.equipment.models import Equipment
 from app.modules.maintenance.models import Defect, InterventionPart, ServiceIntervention
+from app.modules.operations.models import Checklist, ChecklistItem, UsageLog
 from app.modules.reservations.models import Reservation, ReservationStatus
 from app.modules.sites.models import Site
 
@@ -23,7 +24,17 @@ COSTS_URL = "/api/v1/dashboard/costs"
 @pytest.fixture(autouse=True)
 def empty_fleet(db: Session) -> None:
     """Keep the aggregate endpoints isolated from any data already in the local database."""
-    for model in (InterventionPart, ServiceIntervention, Defect, Reservation, Equipment, Site):
+    for model in (
+        ChecklistItem,
+        Checklist,
+        UsageLog,
+        InterventionPart,
+        ServiceIntervention,
+        Defect,
+        Reservation,
+        Equipment,
+        Site,
+    ):
         db.execute(delete(model))
     db.flush()
 
