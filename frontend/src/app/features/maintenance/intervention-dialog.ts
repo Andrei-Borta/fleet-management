@@ -9,6 +9,7 @@ import { finalize } from 'rxjs';
 
 import { asConflict } from '../../core/api-error';
 import { NotificationService } from '../../core/notification.service';
+import { RoleService } from '../../core/role.service';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
 import { MaintenanceService } from './maintenance.service';
 import { Intervention } from './maintenance.models';
@@ -20,7 +21,7 @@ export interface InterventionDialogData {
   changed: (intervention: Intervention) => void;
 }
 
-/** Parts and labour of one intervention. Completed interventions are read-only. */
+/** Parts and labour of one intervention. Read-only once completed or without maintenance.manage. */
 @Component({
   selector: 'app-intervention-dialog',
   imports: [
@@ -73,14 +74,17 @@ export interface InterventionDialogData {
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>Part name</mat-label>
             <input matInput formControlName="name" />
+            <mat-error>Enter a part name.</mat-error>
           </mat-form-field>
           <mat-form-field appearance="outline" subscriptSizing="dynamic" class="small">
             <mat-label>Qty</mat-label>
             <input matInput type="number" min="1" step="1" formControlName="qty" />
+            <mat-error>Enter a quantity of 1 or more.</mat-error>
           </mat-form-field>
           <mat-form-field appearance="outline" subscriptSizing="dynamic" class="small">
             <mat-label>Unit cost (RON)</mat-label>
             <input matInput type="number" min="0" step="0.01" formControlName="unit_cost" />
+            <mat-error>Enter a unit cost of 0 or more.</mat-error>
           </mat-form-field>
           <button mat-stroked-button type="submit" [disabled]="saving()">Add part</button>
         </form>
@@ -92,10 +96,12 @@ export interface InterventionDialogData {
           <mat-form-field appearance="outline" subscriptSizing="dynamic" class="small">
             <mat-label>Hours</mat-label>
             <input matInput type="number" min="0" step="0.5" formControlName="labor_hours" />
+            <mat-error>Enter 0 or more hours.</mat-error>
           </mat-form-field>
           <mat-form-field appearance="outline" subscriptSizing="dynamic" class="small">
             <mat-label>Rate (RON/h)</mat-label>
             <input matInput type="number" min="0" step="0.01" formControlName="labor_rate" />
+            <mat-error>Enter a rate of 0 or more.</mat-error>
           </mat-form-field>
           <button mat-stroked-button type="submit" [disabled]="saving()">Save labour</button>
         </form>
@@ -169,7 +175,10 @@ export class InterventionDialog {
   private readonly fb = inject(NonNullableFormBuilder);
 
   protected readonly item = signal(this.data.intervention);
-  protected readonly editable = computed(() => this.item().status !== 'done');
+  private readonly roles = inject(RoleService);
+  protected readonly editable = computed(
+    () => this.item().status !== 'done' && this.roles.can('maintenance.manage'),
+  );
   protected readonly saving = signal(false);
 
   protected readonly partForm = this.fb.group({

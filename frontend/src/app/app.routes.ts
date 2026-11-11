@@ -1,7 +1,7 @@
 import { inject, isDevMode } from '@angular/core';
 import { Routes } from '@angular/router';
 
-import { RoleService } from './core/role.service';
+import { RoleService, roleGuard } from './core/role.service';
 
 /** Each role lands on its own page (core/role.service.ts). */
 const roleHome = () => inject(RoleService).home();
@@ -15,8 +15,8 @@ const devRoutes: Routes = [
   },
 ];
 
-export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: roleHome },
+/** Pages each role may visit, checked by `roleGuard`; dev pages are left out. */
+const featureRoutes: Routes = [
   {
     path: 'dashboard/costs',
     title: 'Site costs',
@@ -90,7 +90,6 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/operations/operations.page').then((m) => m.OperationsPage),
   },
-  ...(isDevMode() ? devRoutes : []),
   {
     path: 'sites/new',
     title: 'Add site',
@@ -106,5 +105,11 @@ export const routes: Routes = [
     title: 'Site details',
     loadComponent: () => import('./features/sites/site-detail.page').then((m) => m.SiteDetailPage),
   },
+];
+
+export const routes: Routes = [
+  { path: '', pathMatch: 'full', redirectTo: roleHome },
+  ...(isDevMode() ? devRoutes : []),
+  { path: '', canActivateChild: [roleGuard], children: featureRoutes },
   { path: '**', redirectTo: roleHome },
 ];

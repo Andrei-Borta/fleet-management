@@ -1,14 +1,15 @@
 import { CurrencyPipe, DatePipe, TitleCasePipe } from '@angular/common';
-import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { RouterLink } from '@angular/router';
-import { filter, finalize, forkJoin } from 'rxjs';
+import { finalize, forkJoin } from 'rxjs';
 
 import { asConflict } from '../../core/api-error';
 import { NotificationService } from '../../core/notification.service';
+import { RoleService } from '../../core/role.service';
 import { ConfirmService } from '../../shared/confirm-dialog/confirm.service';
 import { toLocalIsoDate } from '../../shared/date-utils';
 import { StatusBadge } from '../../shared/status-badge/status-badge';
@@ -54,7 +55,7 @@ const COLUMNS: { status: InterventionStatus; title: string }[] = [
         @if (unplannedDefects().length === 0) {
           <div class="empty-state">
             <span class="material-symbols-rounded" aria-hidden="true">check_circle</span>
-            <p>Every open defect has a repair planned.</p>
+            <p>No open defects need a repair.</p>
           </div>
         } @else {
           <ul class="defects">
@@ -70,14 +71,16 @@ const COLUMNS: { status: InterventionStatus; title: string }[] = [
                   >
                   <p>{{ defect.description }}</p>
                 </div>
-                <button
-                  mat-stroked-button
-                  [disabled]="busy()"
-                  (click)="planRepair(defect)"
-                  [attr.aria-label]="'Plan repair for defect ' + defect.id"
-                >
-                  Plan repair
-                </button>
+                @if (canManage()) {
+                  <button
+                    mat-stroked-button
+                    [disabled]="busy()"
+                    (click)="planRepair(defect)"
+                    [attr.aria-label]="'Plan repair for defect ' + defect.id"
+                  >
+                    Plan repair
+                  </button>
+                }
               </li>
             }
           </ul>
@@ -125,9 +128,9 @@ const COLUMNS: { status: InterventionStatus; title: string }[] = [
                     (click)="openCosts(item)"
                     [attr.aria-label]="'Parts and labour for intervention ' + item.id"
                   >
-                    {{ item.status === 'done' ? 'View costs' : 'Parts and labour' }}
+                    {{ canManage() && item.status !== 'done' ? 'Parts and labour' : 'View costs' }}
                   </button>
-                  @if (item.status === 'planned') {
+                  @if (canManage() && item.status === 'planned') {
                     <button
                       mat-stroked-button
                       [disabled]="busy()"
@@ -136,7 +139,7 @@ const COLUMNS: { status: InterventionStatus; title: string }[] = [
                     >
                       Start
                     </button>
-                  } @else if (item.status === 'in_progress') {
+                  } @else if (canManage() && item.status === 'in_progress') {
                     <button
                       mat-stroked-button
                       [disabled]="busy()"
@@ -247,8 +250,13 @@ export class MaintenanceBoard {
   private readonly confirm = inject(ConfirmService);
   private readonly dialog = inject(MatDialog);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly roles = inject(RoleService);
+
+  /** An intervention was started or completed, which changes its machine's service status. */
+  readonly statusChanged = output<void>();
 
   protected readonly columns = COLUMNS;
+  protected readonly canManage = computed(() => this.roles.can('maintenance.manage'));
   protected readonly interventions = signal<Intervention[]>([]);
   protected readonly defects = signal<Defect[]>([]);
   private readonly names = signal(new Map<number, string>());
@@ -331,14 +339,17 @@ export class MaintenanceBoard {
       this.update(item, status, 'Intervention started');
       return;
     }
+    // Busy while the confirm is open, so a double click can't open a second one.
+    this.busy.set(true);
     this.confirm
       .confirm({
         title: 'Complete intervention?',
         message: 'Parts and labour cannot be changed afterwards.',
         confirmLabel: 'Complete',
       })
-      .pipe(filter(Boolean))
-      .subscribe(() => this.update(item, status, 'Intervention completed'));
+      .subscribe((confirmed) =>
+        confirmed ? this.update(item, status, 'Intervention completed') : this.busy.set(false),
+      );
   }
 
   protected openCosts(item: Intervention): void {
@@ -362,13 +373,7 @@ export class MaintenanceBoard {
         next: (updated) => {
           this.replace(updated);
           this.notifications.success(message);
-          if (status === 'done') {
-            // A completed repair resolves its defect on the server.
-            this.api
-              .openDefects()
-              .pipe(takeUntilDestroyed(this.destroyRef))
-              .subscribe((defects) => this.defects.set(defects));
-          }
+          this.statusChanged.emit();
         },
         error: (error: unknown) => this.showConflict(error),
       });

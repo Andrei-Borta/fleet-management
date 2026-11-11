@@ -1,5 +1,6 @@
 import { DOCUMENT } from '@angular/common';
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { CanActivateChildFn, Router } from '@angular/router';
 
 /** Demo roles. No authentication in the MVP: the selected role is sent as an X-Role header. */
 export type Role = 'site_manager' | 'fleet_manager' | 'mechanic' | 'operator';
@@ -18,7 +19,8 @@ export type Permission =
   | 'equipment.manage'
   | 'sites.manage'
   | 'reservations.request'
-  | 'reservations.decide';
+  | 'reservations.decide'
+  | 'maintenance.manage';
 
 export interface NavItem {
   path: string;
@@ -48,7 +50,13 @@ const PROFILES: Record<Role, RoleProfile> = {
   fleet_manager: {
     home: '/dashboard',
     nav: NAV_ITEMS.map((item) => item.path),
-    permissions: ['equipment.manage', 'sites.manage', 'reservations.request', 'reservations.decide'],
+    permissions: [
+      'equipment.manage',
+      'sites.manage',
+      'reservations.request',
+      'reservations.decide',
+      'maintenance.manage',
+    ],
   },
   site_manager: {
     home: '/dashboard',
@@ -58,7 +66,7 @@ const PROFILES: Record<Role, RoleProfile> = {
   mechanic: {
     home: '/maintenance',
     nav: ['/equipment', '/calendar', '/maintenance'],
-    permissions: [],
+    permissions: ['maintenance.manage'],
   },
   operator: {
     home: '/operations',
@@ -66,6 +74,13 @@ const PROFILES: Record<Role, RoleProfile> = {
     permissions: [],
   },
 };
+
+/** Create and edit forms need the permission behind their page-header action. */
+const FORM_PERMISSIONS: [RegExp, Permission][] = [
+  [/^\/equipment\/(new|[^/]+\/edit)$/, 'equipment.manage'],
+  [/^\/sites\/(new|[^/]+\/edit)$/, 'sites.manage'],
+  [/^\/reservations\/new$/, 'reservations.request'],
+];
 
 function isRole(value: unknown): value is Role {
   return ROLES.some((r) => r.value === value);
@@ -99,10 +114,15 @@ export class RoleService {
     return PROFILES[role].home;
   }
 
-  /** Whether `url` belongs to a section shown in this role's nav (`/sites/3` → `/sites`). */
+  /**
+   * Whether `url` belongs to a section shown in this role's nav (`/sites/3` → `/sites`)
+   * and, for create and edit forms, whether the role has the matching permission.
+   */
   canVisit(url: string): boolean {
-    const section = '/' + (url.split(/[?#]/)[0].split('/')[1] ?? '');
-    return PROFILES[this.role()].nav.includes(section);
+    const path = url.split(/[?#]/)[0];
+    const section = '/' + (path.split('/')[1] ?? '');
+    const form = FORM_PERMISSIONS.find(([pattern]) => pattern.test(path));
+    return PROFILES[this.role()].nav.includes(section) && (!form || this.can(form[1]));
   }
 
   private store(role: Role): void {
@@ -122,3 +142,9 @@ export class RoleService {
     }
   }
 }
+
+/** Sends pages the current role may not visit (typed URL, reload) to that role's home. */
+export const roleGuard: CanActivateChildFn = (_route, state) => {
+  const roles = inject(RoleService);
+  return roles.canVisit(state.url) || inject(Router).parseUrl(roles.home());
+};

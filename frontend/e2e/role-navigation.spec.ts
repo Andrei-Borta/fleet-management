@@ -109,3 +109,24 @@ test('the role survives a reload', async ({ page }) => {
   await expect(page.getByTestId('role-switcher')).toHaveValue('mechanic');
   await expectNav(page, ['Equipment', 'Calendar', 'Maintenance']);
 });
+
+test('a page outside the role nav redirects to the role home', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('fleet.role', 'mechanic'));
+
+  await page.goto('/sites');
+  await expect(page).toHaveURL(/\/maintenance$/);
+
+  await page.goto('/dashboard');
+  await expect(page).toHaveURL(/\/maintenance$/);
+});
+
+test('a form the role may not use redirects to the role home', async ({ page }) => {
+  await page.goto('/sites/new');
+  await expect(page.getByRole('heading', { level: 1, name: 'Add site' })).toBeVisible();
+
+  await page.getByTestId('role-switcher').selectOption('site_manager');
+  await expect(page).toHaveURL(/\/dashboard$/);
+
+  await page.goto('/sites/new');
+  await expect(page).toHaveURL(/\/dashboard$/);
+});

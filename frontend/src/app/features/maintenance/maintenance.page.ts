@@ -13,8 +13,8 @@ import { ServiceDueSoon } from './service-due-soon';
     <app-page-header title="Maintenance" subtitle="Defects, interventions, parts and costs">
       <a mat-flat-button routerLink="/maintenance/report">Report defect</a>
     </app-page-header>
-    <app-service-due-soon />
-    <app-maintenance-board />
+    <app-service-due-soon #due />
+    <app-maintenance-board (statusChanged)="due.load()" />
   `,
   styles: `
     app-service-due-soon {

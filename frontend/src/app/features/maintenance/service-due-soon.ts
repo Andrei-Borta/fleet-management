@@ -76,7 +76,7 @@ import { DueEquipment } from './maintenance.models';
 export class ServiceDueSoon {
   private readonly api = inject(MaintenanceService);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly decimal = new DecimalPipe('en');
+  private readonly decimal = new DecimalPipe('ro');
 
   protected readonly items = signal<DueEquipment[]>([]);
   protected readonly loading = signal(false);

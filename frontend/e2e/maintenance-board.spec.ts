@@ -154,7 +154,7 @@ test('lists service due with overdue machines first and links to equipment', asy
   const due = page.getByTestId('service-due-item');
   await expect(due).toHaveCount(2);
   await expect(due.first()).toContainText('Liebherr crane');
-  await expect(due.first()).toContainText('2 days overdue · 12.5 h left');
+  await expect(due.first()).toContainText('2 days overdue · 12,5 h left');
   await expect(due.first()).toContainText('Overdue');
   await expect(due.nth(1)).toContainText('5 days left');
 
@@ -188,6 +188,7 @@ test('plans a repair from an open defect and moves it through the board', async 
   await expect(column(page, 'done').getByTestId('intervention-card')).toContainText('CAT 320');
   await expect(page.getByRole('button', { name: 'Complete intervention 11' })).toHaveCount(0);
   expect(state.defects[0].status).toBe('resolved');
+  await expect(page.getByTestId('open-defect')).toHaveCount(0);
 });
 
 test('adds parts and labour and shows the total cost', async ({ page }) => {
@@ -248,6 +249,50 @@ test('shows empty states and retries a failed load', async ({ page }) => {
 
   failBoard = false;
   await page.getByRole('button', { name: 'Retry' }).click();
-  await expect(page.getByText('Every open defect has a repair planned.')).toBeVisible();
+  await expect(page.getByText('No open defects need a repair.')).toBeVisible();
   await expect(column(page, 'planned')).toContainText('No interventions.');
+});
+
+test('operator sees the board read-only', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('fleet.role', 'operator'));
+  await mockApi(page);
+  await page.goto('/maintenance');
+
+  await expect(page.getByTestId('open-defect')).toContainText('Hydraulic leak on boom');
+  await expect(page.getByRole('link', { name: 'Report defect' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Plan repair for defect 7' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Start intervention 10' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Parts and labour for intervention 10' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('No parts yet.')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Add part' })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Save labour' })).toHaveCount(0);
+});
+
+test('reloads service due after an intervention changes status', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/maintenance');
+  await expect(page.getByTestId('service-due-item')).toHaveCount(2);
+
+  const reload = page.waitForRequest('**/api/v1/maintenance/due*', { timeout: 3000 });
+  await page.getByRole('button', { name: 'Start intervention 10' }).click();
+  await reload;
+  await expect(page.getByTestId('service-due-item')).toHaveCount(2);
+});
+
+test('explains invalid parts and labour inline', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/maintenance');
+  await page.getByRole('button', { name: 'Parts and labour for intervention 10' }).click();
+  const dialog = page.getByRole('dialog');
+
+  await dialog.getByLabel('Qty').fill('0');
+  await dialog.getByRole('button', { name: 'Add part' }).click();
+  await expect(dialog.getByText('Enter a part name.')).toBeVisible();
+  await expect(dialog.getByText('Enter a quantity of 1 or more.')).toBeVisible();
+
+  await dialog.getByLabel('Hours').fill('-1');
+  await dialog.getByRole('button', { name: 'Save labour' }).click();
+  await expect(dialog.getByText('Enter 0 or more hours.')).toBeVisible();
 });
