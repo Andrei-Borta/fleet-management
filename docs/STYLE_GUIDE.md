@@ -55,10 +55,10 @@ deep-yellow accent that recalls construction machinery.
 | `in_service` | `--status-service-fg/bg` (amber) | Under maintenance |
 | `defective` | `--status-defective-fg/bg` (red) | Open defect, blocked |
 | `retired` | `--status-retired-fg/bg` (grey) | Out of fleet |
+| `planned` / `in_progress` / `done` | = pending / in_service / available | Maintenance planned, underway, completed |
 | `pending` | `--status-pending-fg/bg` (amber soft) | Reservation awaiting approval |
 | `approved` | = available | Reservation approved |
 | `rejected` / `cancelled` | = defective / retired | Reservation closed |
-| `planned` / `in_progress` / `done` | = pending / in service / available | Maintenance intervention status |
 
 Semantic colours for feedback: `--color-success`, `--color-warning`, `--color-danger`, `--color-info`.
 

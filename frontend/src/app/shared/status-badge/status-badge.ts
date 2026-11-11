@@ -15,6 +15,9 @@ export type Status =
   | 'done';
 
 const TONE: Record<Status, string> = {
+  planned: 'pending',
+  in_progress: 'service',
+  done: 'available',
   available: 'available',
   approved: 'available',
   reserved: 'reserved',
@@ -24,9 +27,6 @@ const TONE: Record<Status, string> = {
   retired: 'retired',
   cancelled: 'retired',
   pending: 'pending',
-  planned: 'pending',
-  in_progress: 'service',
-  done: 'available',
 };
 
 /** The ONLY way to render a status (docs/STYLE_GUIDE.md §3.3). */

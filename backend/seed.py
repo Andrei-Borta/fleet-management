@@ -27,6 +27,7 @@ from app.modules.maintenance.models import (
     InterventionStatus,
     ServiceIntervention,
 )
+from app.modules.operations.models import UsageLog
 from app.modules.reservations.models import Reservation, ReservationStatus
 from app.modules.sites.models import Site
 
@@ -48,14 +49,14 @@ SITES = [
     {
         "name": "Dambovita Bridge",
         "address": "Splaiul Independentei 45, Bucharest",
-        "budget": Decimal("1200000.00"),
+        "budget": Decimal("65000.00"),
         "start_date": date(2026, 10, 1),
         "end_date": date(2027, 8, 31),
     },
     {
         "name": "Pipera Business Park",
         "address": "Bulevardul Pipera 1, Voluntari",
-        "budget": Decimal("450000.00"),
+        "budget": Decimal("20000.00"),
         "start_date": date(2026, 11, 1),
         "end_date": date(2027, 3, 31),
     },
@@ -510,6 +511,7 @@ PARTS = [
 def _clear(session: Session) -> None:
     """Delete every fleet row in foreign-key-safe order."""
     for model in (
+        UsageLog,
         InterventionPart,
         ServiceIntervention,
         Defect,

@@ -38,10 +38,26 @@
 start, end, status}`, ordered by `start`. `type` is `reservation` (pending and approved only) or
   `maintenance` (planned, in progress or done); `id` is the reservation or intervention id. Maintenance
   has no site and `end` is `null` while in progress. Filtering by `site_id` returns reservations only.
+- Defects live under `/maintenance/defects`: `POST` reports one (`equipment_id`, `description`,
+  `severity` of `low`, `medium` or `critical`) and `GET` lists them, with `?equipment_id=` and
+  `?open=true|false` (open or resolved only). Creating a defect, and resolving one by completing its
+  repair, recomputes equipment status in that same transaction. An open critical defect sets the
+  machine to `defective`, unless it is retired or an intervention is in progress (that stays
+  `in_service`). Resolving the last open critical defect frees it again. A missing machine is a `404`.
 - Sites with any reservations cannot be deleted (409), preserving reservation history and site
   cost reporting. Remove a site only when no reservations reference it.
 - A site's dates cannot be changed to exclude an approved reservation (409). A reservation outside
   the site dates is rejected on creation (422) and on approval, if the site has changed since (409).
+- Maintenance interventions: `GET/POST /maintenance/interventions`, `GET/PATCH
+  /maintenance/interventions/{id}`, and `POST /maintenance/interventions/{id}/parts`. Lists accept
+  `equipment_id` and `status` filters. Create uses equipment, optional defect, kind, scheduled date,
+  optional description, labour hours and rate. Status progresses `planned` → `in_progress` → `done`;
+  completed interventions cannot be changed. Part creation returns the updated intervention with
+  parts and total cost (parts plus labour hours × rate, rounded to two decimals). Revisions cannot
+  overlap approved reservations or start before their scheduled date; starting one is rejected if its
+  open-ended work would overlap an approved reservation. Repairs can be scheduled and started despite
+  approved reservations. Completing a repair resolves its linked defect, if any; completing a revision
+  records the equipment's service readings. Status is recomputed on starting and completing work.
 - `GET /dashboard/fleet?from=&to=` returns availability and utilization for an inclusive period
   (`422` when `to` is before `from`). `by_status` has every status, including zeroes. It is a
   snapshot at today when today falls inside the period, otherwise at `to`: equipment with an
@@ -56,3 +72,9 @@ start, end, status}`, ordered by `start`. `type` is `reservation` (pending and a
   that equipment contains the intervention's `scheduled_date`; otherwise it is unattributed. Each row
   has `budget`, `equipment_cost`, `maintenance_cost`, `spent`, `remaining`, `percent_used` and
   `over_budget`.
+- `GET /maintenance/due?within_days=&within_hours=` lists equipment whose service is overdue or will be
+  within the given days (default 7) or engine hours (default 50); both are `>= 0` (`422` otherwise).
+  Retired equipment is left out. Each row is `{equipment_id, name, type, status, days_until_due,
+  hours_until_due, overdue}`; the `*_until_due` values are negative when overdue and `null` when that
+  interval or its last-service reading is not set. Overdue rows come first. This only reports: it does not
+  change the equipment status.

@@ -1,0 +1,67 @@
+<app-page-header [title]="id ? 'Edit site' : 'Add site'" />
+
+<section class="card" [attr.aria-busy]="loading() || saving()">
+  @if (loading() || saving()) {
+    <mat-progress-bar
+      mode="indeterminate"
+      [attr.aria-label]="loading() ? 'Loading site' : 'Saving site'"
+    />
+  }
+  @if (failed()) {
+    <div class="empty-state">
+      <span class="material-symbols-rounded" aria-hidden="true">error</span>
+      <p>Site could not be loaded.</p>
+      <button mat-stroked-button (click)="load()">Retry</button>
+      <a mat-button routerLink="/sites">Back to sites</a>
+    </div>
+  } @else if (!loading()) {
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <div class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Name</mat-label>
+          <input matInput formControlName="name" required maxlength="200" />
+          <mat-error>Enter a site name.</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Address</mat-label>
+          <input matInput formControlName="address" required maxlength="500" />
+          <mat-error>Enter a site address.</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Budget (RON)</mat-label>
+          <input matInput type="number" min="0" step="0.01" formControlName="budget" required />
+          <mat-error>Enter a non-negative budget with up to two decimal places.</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Start date</mat-label>
+          <input matInput type="date" formControlName="start_date" required />
+          <mat-error>Enter a valid start date.</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>End date</mat-label>
+          <input
+            matInput
+            type="date"
+            formControlName="end_date"
+            [errorStateMatcher]="endDateMatcher"
+            required
+          />
+          <mat-error>
+            @if (form.hasError('dateOrder')) {
+              End date must be on or after the start date.
+            } @else {
+              Enter a valid end date.
+            }
+          </mat-error>
+        </mat-form-field>
+      </div>
+      @if (saveError()) {
+        <p class="form-error" role="alert">{{ saveError() }}</p>
+      }
+      <div class="form-actions">
+        <a mat-button [routerLink]="id ? ['/sites', id] : ['/sites']">Cancel</a>
+        <button mat-flat-button type="submit" data-testid="save-site" [disabled]="saving()">Save</button>
+      </div>
+    </form>
+  }
+</section>
