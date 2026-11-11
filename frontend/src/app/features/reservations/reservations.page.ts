@@ -9,6 +9,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatPaginatorModule } from '@angular/material/paginator';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { RouterLink } from '@angular/router';
 import { forkJoin, finalize } from 'rxjs';
 import { asConflict } from '../../core/api-error';
 import { NotificationService } from '../../core/notification.service';
@@ -34,6 +35,7 @@ import { ReservationsService } from './reservations.service';
     MatTabsModule,
     MatPaginatorModule,
     MatProgressBarModule,
+    RouterLink,
     PageHeader,
     StatusBadge,
   ],
