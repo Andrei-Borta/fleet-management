@@ -1,5 +1,7 @@
 // Defect types mirror the maintenance response schemas in backend/app/modules/maintenance/schemas.py.
 
+import { EquipmentStatus } from '../equipment/equipment.models';
+
 export type DefectSeverity = 'low' | 'medium' | 'critical';
 export type DefectStatus = 'open' | 'resolved';
 
@@ -71,4 +73,15 @@ export interface InterventionPart {
   qty: number;
   /** RON. */
   unit_cost: number;
+}
+
+/** Item of `GET /maintenance/due`. Overdue machines come first; negative values are overdue. */
+export interface DueEquipment {
+  equipment_id: number;
+  name: string;
+  type: string;
+  status: EquipmentStatus;
+  days_until_due: number | null;
+  hours_until_due: number | null;
+  overdue: boolean;
 }

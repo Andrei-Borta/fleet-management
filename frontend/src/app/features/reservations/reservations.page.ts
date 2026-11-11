@@ -109,7 +109,7 @@ export class ReservationsPage {
       this.busy() !== null ||
       (action === 'cancel'
         ? !this.canCancel(r)
-        : this.roles.role() !== 'fleet_manager' || r.status !== 'pending')
+        : !this.roles.can('reservations.decide') || r.status !== 'pending')
     )
       return;
     if (action === 'approve') {
@@ -131,7 +131,7 @@ export class ReservationsPage {
     // Check permissions again in case the role changed while a dialog was open.
     if (
       this.busy() !== null ||
-      (action === 'cancel' ? !this.canCancel(r) : this.roles.role() !== 'fleet_manager')
+      (action === 'cancel' ? !this.canCancel(r) : !this.roles.can('reservations.decide'))
     )
       return;
     this.busy.set(r.id);
@@ -147,10 +147,13 @@ export class ReservationsPage {
           this.pageIndex.set(0);
           this.feedback.success(`Reservation ${updated.status}`);
         },
-        error: (error: unknown) =>
-          this.message.set(
-            asConflict(error)?.detail ?? 'The reservation could not be updated. Try again.',
-          ),
+        error: (error: unknown) => {
+          // Other failures already get a snackbar from the error interceptor.
+          const conflict = asConflict(error);
+          if (conflict) this.message.set(conflict.detail);
+          // The request may have changed meanwhile (approved, cancelled, machine blocked).
+          this.load();
+        },
       });
   }
 }

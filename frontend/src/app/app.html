@@ -4,7 +4,7 @@
     <span>Fleet Manager</span>
   </div>
   <nav>
-    @for (item of nav; track item.path) {
+    @for (item of roleService.nav(); track item.path) {
       <a [routerLink]="item.path" routerLinkActive="active" (click)="closeNav()">
         <span class="material-symbols-rounded" aria-hidden="true">{{ item.icon }}</span>
         {{ item.label }}
@@ -43,7 +43,7 @@
       <select
         data-testid="role-switcher"
         [ngModel]="roleService.role()"
-        (ngModelChange)="roleService.role.set($event)"
+        (ngModelChange)="switchRole($event)"
       >
         @for (r of roles; track r.value) {
           <option [value]="r.value">{{ r.label }}</option>
