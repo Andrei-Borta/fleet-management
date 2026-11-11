@@ -1,0 +1,104 @@
+<app-page-header title="New reservation">
+  <a mat-button routerLink="/reservations">Back to reservations</a>
+</app-page-header>
+
+<section class="card" [attr.aria-busy]="loading()">
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Loading reservation form" />
+  } @else if (failed()) {
+    <div class="empty-state">
+      <p>Reservation form could not be loaded.</p>
+      <button mat-stroked-button (click)="load()">Retry</button>
+    </div>
+  } @else {
+    @if (invalidSiteLink()) {
+      <p class="form-notice" role="status">The linked site could not be found. Choose a site below.</p>
+    }
+    @if (!sites().length) {
+      <p role="status">No sites are available. Add a site before requesting equipment.</p>
+    } @else if (!equipment().length) {
+      <p role="status">No equipment is available to request.</p>
+    }
+    <form [formGroup]="form">
+      <div class="form-grid">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Site</mat-label>
+          <mat-select formControlName="site_id" required>
+            @for (site of sites(); track site.id) {
+              <mat-option [value]="site.id">{{ site.name }}</mat-option>
+            }
+          </mat-select>
+          <mat-error>Choose a site.</mat-error>
+        </mat-form-field>
+        <div class="equipment-field" #equipmentOrigin cdkOverlayOrigin #overlayOrigin="cdkOverlayOrigin">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Equipment</mat-label>
+          <input #equipmentTrigger matInput readonly required class="equipment-trigger" role="combobox"
+            aria-label="Equipment" aria-haspopup="dialog" aria-controls="equipment-picker"
+            [attr.aria-expanded]="pickerOpen()" [value]="selectedEquipment()?.name || ''"
+            (click)="pickerOpen.set(true)" (keydown.enter)="pickerOpen.set(true); $event.preventDefault()"
+            (keydown.space)="pickerOpen.set(true); $event.preventDefault()" />
+          <span matSuffix class="material-symbols-rounded" aria-hidden="true">arrow_drop_down</span>
+        </mat-form-field>
+        </div>
+        <ng-template cdkConnectedOverlay [cdkConnectedOverlayOrigin]="overlayOrigin"
+          [cdkConnectedOverlayOpen]="pickerOpen()" [cdkConnectedOverlayHasBackdrop]="true"
+          cdkConnectedOverlayBackdropClass="cdk-overlay-transparent-backdrop"
+          [cdkConnectedOverlayWidth]="equipmentOrigin.offsetWidth"
+          (attach)="focusSearch()" (backdropClick)="closePicker()" (overlayKeydown)="$event.key === 'Escape' && closePicker()">
+          <section class="equipment-popover" id="equipment-picker" role="dialog" aria-label="Choose equipment">
+            <div class="equipment-filters">
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-label>Search equipment</mat-label>
+                <input #equipmentSearch matInput [value]="search()" (input)="search.set(equipmentSearch.value)" />
+              </mat-form-field>
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-label>Category</mat-label>
+                <mat-select [value]="category()" (selectionChange)="category.set($event.value)">
+                  <mat-option value="">All</mat-option>
+                  @for (type of categories(); track type) { <mat-option [value]="type">{{ type }}</mat-option> }
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="equipment-list" aria-label="Equipment choices">
+              @for (machine of filteredEquipment(); track machine.id) {
+                <button type="button" class="equipment-option" [disabled]="machine.status === 'retired'" (click)="selectEquipment(machine)">
+                  <span class="equipment-description">{{ machine.name }} <span class="text-muted">({{ machine.type }})</span></span>
+                  <app-status-badge [status]="machine.status" />
+                </button>
+              } @empty {
+                <p class="text-muted" role="status">No equipment matches these filters.</p>
+              }
+            </div>
+          </section>
+        </ng-template>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Start date</mat-label>
+          <input matInput type="date" formControlName="start_date" [errorStateMatcher]="dateMatcher" required />
+          <mat-error>
+            @if (form.hasError('outsideBounds')) { Dates must be within the site dates. }
+            @else if (form.hasError('dateOrder')) { End date must be on or after the start date. }
+            @else { Enter a valid start date. }
+          </mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>End date</mat-label>
+          <input matInput type="date" formControlName="end_date" [errorStateMatcher]="dateMatcher" required />
+          <mat-error>
+            @if (form.hasError('outsideBounds')) { Dates must be within the site dates. }
+            @else if (form.hasError('dateOrder')) { End date must be on or after the start date. }
+            @else { Enter a valid end date. }
+          </mat-error>
+        </mat-form-field>
+        <mat-form-field class="note-field" appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Note (optional)</mat-label>
+          <textarea matInput formControlName="note"></textarea>
+        </mat-form-field>
+      </div>
+      <div class="form-actions">
+        <a mat-button routerLink="/reservations">Cancel</a>
+        <button mat-flat-button type="button" disabled>Submit request</button>
+      </div>
+    </form>
+  }
+</section>
