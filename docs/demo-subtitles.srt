@@ -1,0 +1,160 @@
+1
+00:00:00,000 --> 00:00:04,900
+Construction fleets: dozens of machines
+across many sites
+
+2
+00:00:05,000 --> 00:00:09,900
+Machines get double-booked
+
+3
+00:00:10,000 --> 00:00:14,900
+Broken machines keep working
+until someone notices
+
+4
+00:00:15,000 --> 00:00:19,900
+Site costs stay invisible
+until the invoices arrive
+
+5
+00:00:20,000 --> 00:00:24,900
+Fleet Management: one place for equipment,
+bookings, repairs and costs
+
+6
+00:00:25,000 --> 00:00:30,900
+Fleet manager: the whole fleet at a glance
+
+7
+00:00:31,000 --> 00:00:36,900
+Available, reserved, in service, defective
+
+8
+00:00:37,000 --> 00:00:42,900
+Two machines are overdue for service.
+They can't be booked until serviced.
+
+9
+00:00:43,000 --> 00:00:47,900
+The bell already flagged them
+
+10
+00:00:48,000 --> 00:01:04,900
+A new excavator arrives:
+CAT 323 joins the fleet
+
+11
+00:01:05,000 --> 00:01:11,900
+Site manager at North Ring Road
+needs an excavator next week
+
+12
+00:01:12,000 --> 00:01:21,900
+Reserve equipment from the site page
+
+13
+00:01:22,000 --> 00:01:31,900
+First choice: the CAT 320
+
+14
+00:01:32,000 --> 00:01:41,900
+Conflict: it's booked until then.
+The app shows the overlapping booking.
+
+15
+00:01:42,000 --> 00:01:51,900
+Free excavators of the same type
+for exactly those dates
+
+16
+00:01:52,000 --> 00:01:59,900
+Including the new CAT 323.
+One click sends the request.
+
+17
+00:02:00,000 --> 00:02:07,900
+Fleet manager: the approvals inbox
+
+18
+00:02:08,000 --> 00:02:15,900
+Approving re-checks the fleet
+
+19
+00:02:16,000 --> 00:02:23,900
+An older CAT 320 request now conflicts,
+so it is rejected
+
+20
+00:02:24,000 --> 00:02:31,900
+The booking is on the central calendar,
+next to maintenance
+
+21
+00:02:32,000 --> 00:02:39,900
+The site manager is notified right away
+
+22
+00:02:40,000 --> 00:02:47,900
+Operator: daily safety check before the shift
+
+23
+00:02:48,000 --> 00:02:57,900
+The loader's brakes fail.
+That's a critical item.
+
+24
+00:02:58,000 --> 00:03:07,900
+The app warns: do not operate this machine
+
+25
+00:03:08,000 --> 00:03:19,900
+A critical defect is recorded
+and the loader is blocked automatically
+
+26
+00:03:20,000 --> 00:03:27,900
+Mechanic: notified of the new defect
+
+27
+00:03:28,000 --> 00:03:37,900
+Plan the repair, then start it.
+The loader is now in service.
+
+28
+00:03:38,000 --> 00:03:51,900
+Log parts and labour:
+2 brake pad sets, 3 hours
+
+29
+00:03:52,000 --> 00:04:01,900
+Total repair cost: 1.150 RON
+
+30
+00:04:02,000 --> 00:04:14,900
+Complete: the defect is resolved
+and the loader is available again
+
+31
+00:04:15,000 --> 00:04:22,900
+Fleet manager: site costs against budget
+
+32
+00:04:23,000 --> 00:04:32,900
+Bookings and repairs are charged
+to the site that had the machine
+
+33
+00:04:33,000 --> 00:04:44,900
+Pipera Business Park: 112% → 118%,
+visible today, not at month end
+
+34
+00:04:45,000 --> 00:04:51,900
+No double bookings. Broken machines blocked.
+Costs visible per site.
+
+35
+00:04:52,000 --> 00:04:59,900
+Next: user accounts with real permissions
+and GPS tracking
