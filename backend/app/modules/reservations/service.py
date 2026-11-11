@@ -13,6 +13,7 @@ from app.core.errors import ConflictError, InvalidDataError, NotFoundError
 from app.modules.equipment.models import Equipment, EquipmentStatus
 from app.modules.maintenance.models import InterventionStatus, ServiceIntervention
 from app.modules.maintenance.rules import is_service_due
+from app.modules.notifications.service import notify
 from app.modules.reservations.models import Reservation, ReservationStatus
 from app.modules.reservations.schemas import (
     AlternativeRead,
@@ -360,8 +361,24 @@ def _require_pending(reservation: Reservation, action: str) -> None:
         raise ConflictError(f"Only pending reservations can be {action}")
 
 
+def _notify_requester(db: Session, reservation: Reservation, decision: str) -> None:
+    """Tell the site managers that their request was decided (in the same transaction)."""
+    equipment = db.get(Equipment, reservation.equipment_id)
+    site = db.get(Site, reservation.site_id)
+    period = f"{reservation.start_date:%d %b %Y} – {reservation.end_date:%d %b %Y}"
+    notify(
+        db,
+        Role.SITE_MANAGER,
+        f"Reservation {decision}",
+        f"{equipment.name} at {site.name}, {period}.",
+        "/reservations",
+    )
+
+
 def _set_status(db: Session, reservation: Reservation, status: ReservationStatus) -> Reservation:
     reservation.status = status
+    if status in (ReservationStatus.APPROVED, ReservationStatus.REJECTED):
+        _notify_requester(db, reservation, status.value)
     db.commit()
     db.refresh(reservation)
     return reservation

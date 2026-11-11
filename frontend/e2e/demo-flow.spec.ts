@@ -219,7 +219,8 @@ test('demo storyline: request, conflict, approval, defect, repair and costs', as
     await page.getByRole('combobox', { name: 'Site', exact: true }).click();
     await page.getByRole('option', { name: `Floreasca Tower ${id}`, exact: true }).click();
     // 3 days × 8 h × 180 RON booking + 750 RON repair = 5,070 RON committed.
-    await expect(page.getByRole('cell', { name: '5.070,00 RON', exact: true })).toBeVisible();
+    const siteRow = page.getByRole('row').filter({ hasText: `Floreasca Tower ${id}` });
+    await expect(siteRow.getByRole('cell', { name: '5.070,00 RON', exact: true })).toBeVisible();
     await page
       .getByRole('button', { name: `View costs for Floreasca Tower ${id}`, exact: true })
       .click();
