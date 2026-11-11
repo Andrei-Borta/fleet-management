@@ -18,6 +18,7 @@ from app.modules.maintenance.models import (
     InterventionStatus,
     ServiceIntervention,
 )
+from app.modules.operations.models import Checklist, ChecklistItem, UsageLog
 from app.modules.reservations.models import Reservation, ReservationStatus
 from app.modules.sites.models import Site
 
@@ -27,7 +28,17 @@ D = date(2099, 5, 1)
 @pytest.fixture(autouse=True)
 def empty_fleet(db: Session) -> None:
     """Aggregates are global, so start each test from an empty fleet (rolled back afterwards)."""
-    for model in (InterventionPart, ServiceIntervention, Defect, Reservation, Equipment, Site):
+    for model in (
+        ChecklistItem,
+        Checklist,
+        UsageLog,
+        InterventionPart,
+        ServiceIntervention,
+        Defect,
+        Reservation,
+        Equipment,
+        Site,
+    ):
         db.execute(delete(model))
     db.flush()
 
