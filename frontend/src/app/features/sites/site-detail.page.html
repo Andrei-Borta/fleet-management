@@ -61,11 +61,11 @@
         @for (reservation of reservations(); track reservation.id) {
           <li>
             @if (hasEquipmentDetails) {
-              <a [routerLink]="['/equipment', reservation.equipment_id]"
-                >Equipment #{{ reservation.equipment_id }}</a
-              >
+              <a [routerLink]="['/equipment', reservation.equipment_id]">{{
+                equipmentName(reservation.equipment_id)
+              }}</a>
             } @else {
-              <span>Equipment #{{ reservation.equipment_id }}</span>
+              <span>{{ equipmentName(reservation.equipment_id) }}</span>
             }
             · {{ reservation.start_date | date: 'dd MMM yyyy' }} –
             {{ reservation.end_date | date: 'dd MMM yyyy' }}

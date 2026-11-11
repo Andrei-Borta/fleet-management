@@ -19,7 +19,7 @@ test('app shell loads and redirects to dashboard', async ({ page }) => {
 for (const name of pages) {
   test(`navigates to ${name}`, async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('link', { name }).click();
+    await page.getByRole('link', { name, exact: true }).click();
     await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
   });
 }
