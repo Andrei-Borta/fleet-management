@@ -6,6 +6,17 @@ never get sent to a site.
 
 **Stack:** FastAPI · SQLAlchemy 2 · Alembic · PostgreSQL · Angular 20 · Angular Material · Playwright
 
+## Screenshots
+| Dashboard | Reservation conflict with alternatives |
+|---|---|
+| ![Dashboard with fleet status and utilization](docs/images/dashboard.png) | ![A conflicting request suggests free excavators](docs/images/reservation-conflict.png) |
+| **Site costs vs. budget** | **Reporting a defect** |
+| ![Site costs with an over-budget site](docs/images/site-costs.png) | ![Operator reporting a critical defect](docs/images/report-defect.png) |
+| **Maintenance board** | |
+| ![Mechanic's maintenance board with planned, in-progress and done repairs](docs/images/maintenance-board.png) | |
+
+How to use the app as each role: [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
+
 ## Quick start
 ```bash
 docker compose up -d db
@@ -24,6 +35,7 @@ See the docs below for the full setup.
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Git workflow, PR rules, definition of done |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Repository and module layout |
 | [docs/API_CONVENTIONS.md](docs/API_CONVENTIONS.md) | REST conventions shared by BE and FE |
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | How to use the app, one section per role |
 | [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | Storyline for the 5-minute demo video |
 | [docs/STYLE_GUIDE.md](docs/STYLE_GUIDE.md) | UI design system: colours, typography, layout, components |
 | [AGENTS.md](AGENTS.md) | Rules for AI coding agents (also read by humans!) |
